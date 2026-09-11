@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Кнопки меню</h1>
+<p class="muted">
+  Кнопки с кодом <code>menu_*</code> показываются в главном меню бота.
+  Порядок и подписи правятся здесь — без деплоя.
+</p>
+<table>
+  <thead>
+    <tr><th>Порядок</th><th>Код</th><th>Название</th><th>Тип</th><th>Активна</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for b in buttons %}
+    <tr>
+      <td>{{ b.sort_order }}</td>
+      <td><code>{{ b.code }}</code></td>
+      <td>{{ b.title }}</td>
+      <td>{{ b.action_type }}</td>
+      <td>{{ "да" if b.is_active else "нет" }}</td>
+      <td><a href="/admin/buttons/{{ b.id }}">Редактировать</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,165 @@
+:root {
+  --bg: #f3f1ec;
+  --panel: #fffdf8;
+  --ink: #1c2420;
+  --muted: #5c675f;
+  --line: #d7d2c8;
+  --accent: #1f6b4a;
+  --accent-ink: #f7fff9;
+  --danger: #8b2e2e;
+  --ok: #1f6b4a;
+  --font: "Segoe UI", "IBM Plex Sans", sans-serif;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, #e7efe8 0, transparent 40%),
+    linear-gradient(180deg, #f7f4ee, var(--bg));
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.4rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 253, 248, 0.92);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.brand { font-weight: 700; letter-spacing: 0.01em; }
+.topbar nav { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.topbar a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.4rem;
+}
+.topbar a.active, .topbar a:hover {
+  color: var(--ink);
+  background: #e8efe9;
+}
+.logout button {
+  border: 1px solid var(--line);
+  background: transparent;
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+.container { width: min(1100px, calc(100% - 2rem)); margin: 1.5rem auto 3rem; }
+h1 { margin: 0 0 1rem; font-size: 1.7rem; }
+h2 { margin-top: 2rem; font-size: 1.15rem; }
+.muted { color: var(--muted); }
+.error { color: var(--danger); }
+
+.flash {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--line);
+}
+.flash-ok { background: #e8f5ee; border-color: #b9dcc8; }
+.flash-error { background: #f8e8e8; border-color: #e0b8b8; }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1.5rem;
+}
+.stat {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  padding: 1rem;
+}
+.stat span { display: block; font-size: 1.6rem; font-weight: 700; }
+.stat small { color: var(--muted); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  overflow: hidden;
+}
+th, td {
+  text-align: left;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+th { background: #eef3ef; font-size: 0.85rem; color: var(--muted); }
+tr:last-child td { border-bottom: none; }
+a { color: var(--accent); }
+
+.stack { display: grid; gap: 0.9rem; max-width: 720px; }
+label { display: grid; gap: 0.35rem; font-weight: 600; }
+label small { font-weight: 400; }
+input, textarea, select, button {
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--line);
+}
+textarea { resize: vertical; }
+button[type="submit"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  cursor: pointer;
+  width: fit-content;
+  font-weight: 600;
+}
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+.checkbox input { width: auto; }
+
+.login-card {
+  width: min(420px, 100%);
+  margin: 4rem auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  padding: 1.5rem;
+}
+.login-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.login-card h1 { margin-bottom: 0.4rem; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.2rem;
+}
+.question { white-space: pre-wrap; line-height: 1.45; }
+.details { display: grid; grid-template-columns: 180px 1fr; gap: 0.5rem 1rem; }
+.details dt { color: var(--muted); }
+.details dd { margin: 0; }
+.filters { margin-bottom: 1rem; }
+
+@media (max-width: 720px) {
+  .topbar { flex-direction: column; align-items: flex-start; }
+  .details { grid-template-columns: 1fr; }
+}

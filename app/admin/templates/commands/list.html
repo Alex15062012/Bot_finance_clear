@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Меню у поля ввода</h1>
+<p class="muted">
+  Эти команды появляются при нажатии на кнопку <strong>/</strong> рядом со строкой ввода в MAX.
+  После правок нажмите «Синхронизировать с MAX».
+</p>
+<form method="post" action="/admin/commands/sync" style="margin-bottom:1rem">
+  <button type="submit">Синхронизировать с MAX</button>
+</form>
+<table>
+  <thead>
+    <tr><th>Порядок</th><th>Команда</th><th>Описание</th><th>Активна</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for c in commands %}
+    <tr>
+      <td>{{ c.sort_order }}</td>
+      <td><code>/{{ c.name }}</code></td>
+      <td>{{ c.description }}</td>
+      <td>{{ "да" if c.is_active else "нет" }}</td>
+      <td><a href="/admin/commands/{{ c.id }}">Редактировать</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="muted">Команд нет — перезапустите приложение для seed</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

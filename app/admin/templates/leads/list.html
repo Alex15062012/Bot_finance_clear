@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Обращения</h1>
+<form method="get" class="filters">
+  <label>Статус
+    <select name="status" onchange="this.form.submit()">
+      <option value="">Все</option>
+      {% for value, label in status_labels.items() %}
+        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+<table>
+  <thead>
+    <tr><th>ID</th><th>Пользователь</th><th>Вопрос</th><th>Статус</th><th>Дата</th></tr>
+  </thead>
+  <tbody>
+  {% for lead in leads %}
+    {% set u = users_map.get(lead.user_id) %}
+    <tr>
+      <td><a href="/admin/leads/{{ lead.id }}">#{{ lead.id }}</a></td>
+      <td>{% if u %}{{ u.name or u.platform_user_id }}{% else %}—{% endif %}</td>
+      <td>{{ lead.question[:100] }}{% if lead.question|length > 100 %}…{% endif %}</td>
+      <td>{{ status_labels.get(lead.status, lead.status) }}</td>
+      <td>{{ lead.created_at }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="muted">Пока нет обращений</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

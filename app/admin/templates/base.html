@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} · {{ admin_brand }}</title>
+  <link rel="stylesheet" href="/admin/static/admin.css">
+</head>
+<body>
+  {% if section != 'login' %}
+  <header class="topbar">
+    <div class="brand">{{ admin_brand }}</div>
+    <nav>
+      {% for item in nav %}
+        <a href="{{ item.href }}" class="{% if section == item.section %}active{% endif %}">{{ item.label }}</a>
+      {% endfor %}
+    </nav>
+    <form method="post" action="/admin/logout" class="logout">
+      <button type="submit">Выйти</button>
+    </form>
+  </header>
+  {% endif %}
+
+  <main class="container">
+    {% if flash %}
+      <div class="flash flash-{{ flash.level }}">{{ flash.message }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

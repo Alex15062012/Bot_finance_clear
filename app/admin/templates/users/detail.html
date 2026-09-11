@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="/admin/users">← К списку</a></p>
+<h1>Пользователь #{{ user.id }}</h1>
+<dl class="details">
+  <dt>Имя</dt><dd>{{ user.name or "—" }}</dd>
+  <dt>Username</dt><dd>{{ user.username or "—" }}</dd>
+  <dt>Platform ID</dt><dd>{{ user.platform_user_id }}</dd>
+  <dt>Источник</dt><dd>{{ user.source or "—" }}</dd>
+  <dt>Этап</dt><dd>{{ user.state }}</dd>
+  <dt>Приветствие</dt><dd>{{ "да" if user.welcome_sent else "нет" }} {% if user.welcome_sent_at %}({{ user.welcome_sent_at }}){% endif %}</dd>
+  <dt>Материалы</dt><dd>{{ "да" if user.materials_sent else "нет" }} {% if user.materials_sent_at %}({{ user.materials_sent_at }}){% endif %}</dd>
+  <dt>Первый контакт</dt><dd>{{ user.first_seen_at }}</dd>
+  <dt>Подписка</dt><dd>{{ user.subscribed_at or "—" }}</dd>
+  <dt>Последний контакт</dt><dd>{{ user.last_interaction_at }}</dd>
+</dl>
+{% endblock %}

@@ -1,0 +1,73 @@
+# Бот «Про Финансы Ясно» на сервере:
+#   web  — админка (+ endpoint webhook, если понадобится)
+#   bot  — long polling (обновления из MAX без публичного URL)
+#   db   — PostgreSQL
+#
+# Запуск:
+#   1. cp .env.example .env  и заполните MAX_BOT_TOKEN, BOT_USERNAME, ADMIN_*
+#   2. docker compose up -d --build
+#   3. Админка: http://SERVER_IP:8000/admin/
+#
+# Webhook и polling одновременно нельзя.
+# Если переходите на webhook — остановите bot:
+#   docker compose stop bot
+# и зарегистрируйте WEBHOOK_URL (python -m app.register_webhook внутри web).
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bot
+      POSTGRES_PASSWORD: bot
+      POSTGRES_DB: bot_uv
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bot -d bot_uv"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # Порт наружу не публикуем — только внутренняя сеть compose
+
+  web:
+    build: .
+    image: bot-uv:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+asyncpg://bot:bot@db:5432/bot_uv
+      MAX_CA_BUNDLE: certs/ca-bundle.pem
+    ports:
+      - "${ADMIN_HOST_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/admin/login"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  bot:
+    image: bot-uv:latest
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "app.polling"]
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+asyncpg://bot:bot@db:5432/bot_uv
+      MAX_CA_BUNDLE: certs/ca-bundle.pem
+
+volumes:
+  pgdata:

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Материалы</h1>
+<table>
+  <thead>
+    <tr><th>Порядок</th><th>Название</th><th>Тип</th><th>Активен</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for m in materials %}
+    <tr>
+      <td>{{ m.sort_order }}</td>
+      <td>{{ m.title }}</td>
+      <td>{{ m.content_type }}</td>
+      <td>{{ "да" if m.is_active else "нет" }}</td>
+      <td><a href="/admin/materials/{{ m.id }}">Редактировать</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Пользователи</h1>
+<table>
+  <thead>
+    <tr><th>ID</th><th>Имя</th><th>Platform ID</th><th>Этап</th><th>Материалы</th><th>Последний контакт</th></tr>
+  </thead>
+  <tbody>
+  {% for u in users %}
+    <tr>
+      <td><a href="/admin/users/{{ u.id }}">#{{ u.id }}</a></td>
+      <td>{{ u.name or "—" }}</td>
+      <td>{{ u.platform_user_id }}</td>
+      <td>{{ u.state }}</td>
+      <td>{{ "да" if u.materials_sent else "нет" }}</td>
+      <td>{{ u.last_interaction_at }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="muted">Пользователей пока нет</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

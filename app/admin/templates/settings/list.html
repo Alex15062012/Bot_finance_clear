@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Настройки контента</h1>
+<p class="muted">Технические секреты (токен, БД) здесь не редактируются — только контент сценариев.</p>
+<form method="post" action="/admin/settings" class="stack">
+  {% for s in settings %}
+    <label>{{ s.key }}
+      {% if s.description %}<small class="muted">{{ s.description }}</small>{% endif %}
+      {% if s.value|length > 120 or '\n' in s.value %}
+        <textarea name="{{ s.key }}" rows="4">{{ s.value }}</textarea>
+      {% else %}
+        <input type="text" name="{{ s.key }}" value="{{ s.value }}">
+      {% endif %}
+    </label>
+  {% endfor %}
+  <button type="submit">Сохранить</button>
+</form>
+{% endblock %}

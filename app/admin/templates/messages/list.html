@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Тексты сообщений</h1>
+<p class="muted">Правки применяются сразу, без деплоя кода. Переменные: <code>{{ '{{name}}' }}</code></p>
+<table>
+  <thead>
+    <tr><th>Код</th><th>Название</th><th>Версия</th><th>Активен</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for m in messages %}
+    <tr>
+      <td><code>{{ m.code }}</code></td>
+      <td>{{ m.title }}</td>
+      <td>v{{ m.version }}</td>
+      <td>{{ "да" if m.is_active else "нет" }}</td>
+      <td><a href="/admin/messages/{{ m.id }}">Редактировать</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

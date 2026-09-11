@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="/admin/buttons">← К списку</a></p>
+<h1>{{ button.code }}</h1>
+<form method="post" action="/admin/buttons/{{ button.id }}" class="stack">
+  <label>Название на кнопке
+    <input type="text" name="title" value="{{ button.title }}" required>
+  </label>
+  <label>Тип действия
+    <select name="action_type">
+      {% for t in ["callback", "link", "open_bot", "message"] %}
+        <option value="{{ t }}" {% if button.action_type == t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>URL (для link / open_bot)
+    <input type="text" name="url" value="{{ button.url or '' }}">
+  </label>
+  <label>Payload (для callback, например menu:materials)
+    <input type="text" name="payload" value="{{ button.payload or '' }}">
+  </label>
+  <label>Сценарий
+    <input type="text" name="scenario" value="{{ button.scenario or '' }}">
+  </label>
+  <label>Порядок
+    <input type="number" name="sort_order" value="{{ button.sort_order }}">
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" name="is_active" {% if button.is_active %}checked{% endif %}>
+    Активна
+  </label>
+  <button type="submit">Сохранить</button>
+</form>
+{% endblock %}

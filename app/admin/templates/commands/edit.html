@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="/admin/commands">← К списку</a></p>
+<h1>/{{ command.name }}</h1>
+<form method="post" action="/admin/commands/{{ command.id }}" class="stack">
+  <label>Имя команды (без /)
+    <input type="text" name="name" value="{{ command.name }}" required maxlength="64">
+  </label>
+  <label>Описание в меню MAX
+    <input type="text" name="description" value="{{ command.description }}" required maxlength="128">
+  </label>
+  <label>Порядок
+    <input type="number" name="sort_order" value="{{ command.sort_order }}">
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" name="is_active" {% if command.is_active %}checked{% endif %}>
+    Активна
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" name="sync" value="1" checked>
+    Сразу синхронизировать с MAX
+  </label>
+  <button type="submit">Сохранить</button>
+</form>
+{% endblock %}

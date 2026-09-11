@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="/admin/messages">← К списку</a></p>
+<h1>{{ message.code }}</h1>
+<form method="post" action="/admin/messages/{{ message.id }}" class="stack">
+  <label>Название
+    <input type="text" name="title" value="{{ message.title }}" required>
+  </label>
+  <label>Текст
+    <textarea name="text" rows="16" required>{{ message.text }}</textarea>
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" name="is_active" {% if message.is_active %}checked{% endif %}>
+    Активен
+  </label>
+  <button type="submit">Сохранить</button>
+</form>
+{% endblock %}

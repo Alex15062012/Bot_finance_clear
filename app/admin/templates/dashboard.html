@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Обзор</h1>
+<div class="stats">
+  <div class="stat"><span>{{ stats.new_leads }}</span><small>Новые заявки</small></div>
+  <div class="stat"><span>{{ stats.leads }}</span><small>Всего обращений</small></div>
+  <div class="stat"><span>{{ stats.users }}</span><small>Пользователи</small></div>
+  <div class="stat"><span>{{ stats.messages }}</span><small>Тексты</small></div>
+  <div class="stat"><span>{{ stats.materials }}</span><small>Материалы</small></div>
+</div>
+
+<h2>Последние обращения</h2>
+{% if recent_leads %}
+<table>
+  <thead>
+    <tr><th>ID</th><th>Вопрос</th><th>Статус</th><th>Дата</th></tr>
+  </thead>
+  <tbody>
+  {% for lead in recent_leads %}
+    <tr>
+      <td><a href="/admin/leads/{{ lead.id }}">#{{ lead.id }}</a></td>
+      <td>{{ lead.question[:80] }}{% if lead.question|length > 80 %}…{% endif %}</td>
+      <td>{{ lead.status }}</td>
+      <td>{{ lead.created_at }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Обращений пока нет.</p>
+{% endif %}
+{% endblock %}

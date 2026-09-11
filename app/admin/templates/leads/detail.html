@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="/admin/leads">← К списку</a></p>
+<h1>Обращение #{{ lead.id }}</h1>
+
+<div class="panel">
+  <p><strong>Вопрос:</strong></p>
+  <p class="question">{{ lead.question }}</p>
+  <p class="muted">Источник: {{ lead.source or "—" }} · {{ lead.created_at }}</p>
+  {% if user %}
+  <p>Пользователь: <a href="/admin/users/{{ user.id }}">{{ user.name or user.platform_user_id }}</a>
+    (platform_id={{ user.platform_user_id }})</p>
+  {% endif %}
+</div>
+
+<form method="post" action="/admin/leads/{{ lead.id }}" class="stack">
+  <label>Статус
+    <select name="status">
+      {% for value, label in status_labels.items() %}
+        <option value="{{ value }}" {% if lead.status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Ответственный
+    <input type="text" name="assigned_to" value="{{ lead.assigned_to or '' }}">
+  </label>
+  <label>Комментарий
+    <textarea name="comment" rows="5">{{ lead.comment or '' }}</textarea>
+  </label>
+  <button type="submit">Сохранить</button>
+</form>
+{% endblock %}
