@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 UPDATE_TYPES = [
     "message_created",
     "bot_started",
+    "bot_stopped",
+    "dialog_removed",
     "user_added",
     "user_removed",
     "bot_added",

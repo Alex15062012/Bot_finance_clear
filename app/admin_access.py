@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.config import Settings, get_settings
 
 
@@ -16,7 +18,15 @@ def parse_admin_ids(raw: str) -> set[int]:
     return ids
 
 
-def is_bot_admin(platform_user_id: int, settings: Settings | None = None) -> bool:
+def is_bot_admin(
+    platform_user_id: int,
+    settings: Settings | None = None,
+    *,
+    user: Any | None = None,
+) -> bool:
+    """Админ бота: флаг users.is_admin в БД или ID из ADMIN_PLATFORM_USER_IDS."""
+    if user is not None and bool(getattr(user, "is_admin", False)):
+        return True
     settings = settings or get_settings()
     return platform_user_id in parse_admin_ids(settings.admin_platform_user_ids)
 

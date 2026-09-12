@@ -1,9 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Пользователи</h1>
+<p class="muted">Все, кто открыл бота. Можно назначить администратором (команда /admin в боте).</p>
 <table>
   <thead>
-    <tr><th>ID</th><th>Имя</th><th>Platform ID</th><th>Этап</th><th>Материалы</th><th>Последний контакт</th></tr>
+    <tr>
+      <th>ID</th>
+      <th>Имя</th>
+      <th>Platform ID</th>
+      <th>Админ</th>
+      <th>Статус бота</th>
+      <th>Этап</th>
+      <th>Материалы</th>
+      <th>Последний контакт</th>
+    </tr>
   </thead>
   <tbody>
   {% for u in users %}
@@ -11,12 +21,20 @@
       <td><a href="/admin/users/{{ u.id }}">#{{ u.id }}</a></td>
       <td>{{ u.name or "—" }}</td>
       <td>{{ u.platform_user_id }}</td>
+      <td>{{ "да" if u.is_admin else "нет" }}</td>
+      <td>
+        {% if u.bot_status == 'blocked' %}
+          <span class="error">{{ u.bot_status_label }}</span>
+        {% else %}
+          <span class="status-ok">{{ u.bot_status_label }}</span>
+        {% endif %}
+      </td>
       <td>{{ u.state }}</td>
       <td>{{ "да" if u.materials_sent else "нет" }}</td>
       <td>{{ u.last_interaction_at }}</td>
     </tr>
   {% else %}
-    <tr><td colspan="6" class="muted">Пользователей пока нет</td></tr>
+    <tr><td colspan="8" class="muted">Пользователей пока нет</td></tr>
   {% endfor %}
   </tbody>
 </table>

@@ -31,6 +31,24 @@ async def test_user_unique(session: AsyncSession):
 
 
 @pytest.mark.asyncio
+async def test_user_block_and_reactivate(session: AsyncSession):
+    from app.db.models.user import BotUsageStatus
+
+    users = UserService(session)
+    user, _ = await users.get_or_create(200, name="B", source="bot_started")
+    assert user.bot_status == BotUsageStatus.ACTIVE.value
+
+    await users.mark_blocked(user)
+    assert user.bot_status == BotUsageStatus.BLOCKED.value
+    assert user.blocked_at is not None
+
+    user2, created = await users.get_or_create(200, name="B", mark_active=True)
+    assert created is False
+    assert user2.bot_status == BotUsageStatus.ACTIVE.value
+    assert user2.blocked_at is None
+
+
+@pytest.mark.asyncio
 async def test_idempotency(session: AsyncSession):
     svc = IdempotencyService(session)
     assert await svc.try_claim("k1", "user_added") is True

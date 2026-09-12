@@ -7,6 +7,26 @@
   <dt>Username</dt><dd>{{ user.username or "—" }}</dd>
   <dt>Platform ID</dt><dd>{{ user.platform_user_id }}</dd>
   <dt>Источник</dt><dd>{{ user.source or "—" }}</dd>
+  <dt>Администратор бота</dt>
+  <dd>
+    {% if user.is_admin %}
+      <span class="status-ok">да</span>
+    {% else %}
+      нет
+    {% endif %}
+    {% if env_admin %}
+      <span class="muted">(также в ADMIN_PLATFORM_USER_IDS)</span>
+    {% endif %}
+  </dd>
+  <dt>Статус бота</dt>
+  <dd>
+    {% if user.bot_status == 'blocked' %}
+      <span class="error">{{ user.bot_status_label }}</span>
+      {% if user.blocked_at %} ({{ user.blocked_at }}){% endif %}
+    {% else %}
+      <span class="status-ok">{{ user.bot_status_label }}</span>
+    {% endif %}
+  </dd>
   <dt>Этап</dt><dd>{{ user.state }}</dd>
   <dt>Приветствие</dt><dd>{{ "да" if user.welcome_sent else "нет" }} {% if user.welcome_sent_at %}({{ user.welcome_sent_at }}){% endif %}</dd>
   <dt>Материалы</dt><dd>{{ "да" if user.materials_sent else "нет" }} {% if user.materials_sent_at %}({{ user.materials_sent_at }}){% endif %}</dd>
@@ -14,4 +34,20 @@
   <dt>Подписка</dt><dd>{{ user.subscribed_at or "—" }}</dd>
   <dt>Последний контакт</dt><dd>{{ user.last_interaction_at }}</dd>
 </dl>
+
+<section class="panel" style="margin-top:1.5rem">
+  <h2>Права администратора</h2>
+  <p class="muted">Админ бота получает ссылку на веб-панель по команде <code>/admin</code>.</p>
+  {% if user.is_admin %}
+  <form method="post" action="/admin/users/{{ user.id }}/admin">
+    <input type="hidden" name="is_admin" value="0">
+    <button type="submit">Снять роль администратора</button>
+  </form>
+  {% else %}
+  <form method="post" action="/admin/users/{{ user.id }}/admin">
+    <input type="hidden" name="is_admin" value="1">
+    <button type="submit">Назначить администратором</button>
+  </form>
+  {% endif %}
+</section>
 {% endblock %}

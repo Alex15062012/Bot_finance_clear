@@ -14,3 +14,12 @@ def test_is_bot_admin():
     )
     assert is_bot_admin(100, s) is True
     assert is_bot_admin(999, s) is False
+
+
+def test_is_bot_admin_from_user_flag():
+    class U:
+        is_admin = True
+
+    s = Settings(admin_platform_user_ids="", max_bot_token="x")
+    assert is_bot_admin(999, s, user=U()) is True
+    assert is_bot_admin(999, s, user=None) is False

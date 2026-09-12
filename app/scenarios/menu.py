@@ -153,7 +153,7 @@ class MenuScenario(Scenario):
             await self._ask_question(ctx, user, platform_user_id)
             return True
         if cmd == "admin":
-            await self._send_admin_link(ctx, platform_user_id)
+            await self._send_admin_link(ctx, user, platform_user_id)
             return True
 
         return False
@@ -230,18 +230,17 @@ class MenuScenario(Scenario):
             button_codes=await self._menu_buttons(ctx),
         )
 
-    async def _send_admin_link(self, ctx: ScenarioContext, platform_user_id: int) -> None:
-        if not is_bot_admin(platform_user_id):
+    async def _send_admin_link(self, ctx: ScenarioContext, user, platform_user_id: int) -> None:
+        if not is_bot_admin(platform_user_id, user=user):
             logger.warning(
-                "admin denied for platform_user_id=%s (not in ADMIN_PLATFORM_USER_IDS)",
+                "admin denied for platform_user_id=%s",
                 platform_user_id,
             )
             text = (
                 "Нет доступа к веб-админке.\n\n"
                 f"Ваш MAX user_id: `{platform_user_id}`\n\n"
-                "Добавьте его в `ADMIN_PLATFORM_USER_IDS` в `.env` на сервере "
-                "(несколько админов через запятую: `5600001,18473332`) "
-                "и перезапустите бота."
+                "Администратор может назначить вас в разделе «Пользователи» веб-админки "
+                "или добавить ID в `ADMIN_PLATFORM_USER_IDS` в `.env`."
             )
             try:
                 await ctx.messaging._send(platform_user_id, text)  # noqa: SLF001
@@ -264,9 +263,9 @@ class MenuScenario(Scenario):
             return
 
         text = (
-            "Веб-админка для управления текстами, меню и обращениями:\n"
-            f"{url}\n\n"
-            "Войдите логином и паролем из `.env` (`ADMIN_USERNAME` / `ADMIN_PASSWORD`)."
+            "Здравствуйте! 👋\n\n"
+            "Ваша панель управления ботом — здесь можно менять тексты, меню и смотреть обращения:\n"
+            f"{url}"
         )
         attachments = [inline_keyboard([[link_button("Открыть админку", url)]])]
         try:
