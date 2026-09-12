@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.scenarios.base import Scenario
 from app.scenarios.bot_lifecycle import BotLifecycleScenario
+from app.scenarios.chat_inbound import ChatInboundScenario
 from app.scenarios.materials import MaterialsScenario
 from app.scenarios.menu import MenuScenario
 from app.scenarios.new_subscriber import NewSubscriberScenario
@@ -15,5 +16,6 @@ def build_scenarios() -> list[Scenario]:
         NewSubscriberScenario(),
         MaterialsScenario(),
         MenuScenario(),
+        ChatInboundScenario(),
         QuestionScenario(),
     ]

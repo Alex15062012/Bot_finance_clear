@@ -8,6 +8,7 @@ from app.db.models.material import Material, MaterialType
 from app.db.models.message import MessageTemplate
 from app.db.models.processed_update import ProcessedUpdate
 from app.db.models.setting import Setting
+from app.db.models.chat_message import ChatDirection, ChatMessage
 from app.db.models.user import BOT_USAGE_STATUS_LABELS, BotUsageStatus, User, UserState
 
 __all__ = [
@@ -16,6 +17,8 @@ __all__ = [
     "BotCommandRow",
     "BotUsageStatus",
     "Button",
+    "ChatDirection",
+    "ChatMessage",
     "Consent",
     "ConsentDocument",
     "Event",

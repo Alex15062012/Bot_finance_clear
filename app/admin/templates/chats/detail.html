@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="/admin/chats">← К чатам</a> · <a href="/admin/users/{{ user.id }}">Карточка пользователя</a></p>
+<h1>Чат с {{ user.name or user.platform_user_id }}</h1>
+<p class="muted">MAX id {{ user.platform_user_id }} · {{ user.bot_status_label }}</p>
+
+<section class="chat-thread">
+  {% for m in messages %}
+    <div class="chat-bubble chat-{{ m.direction }}">
+      <div class="chat-meta">
+        {% if m.direction == 'outbound' %}
+          Админ{% if m.admin_username %} ({{ m.admin_username }}){% endif %}
+        {% else %}
+          Пользователь
+        {% endif %}
+        · {{ m.created_at }}
+      </div>
+      <div class="chat-text">{{ m.text }}</div>
+    </div>
+  {% else %}
+    <p class="muted">Сообщений пока нет. Напишите первое ниже — оно уйдёт пользователю в бот.</p>
+  {% endfor %}
+</section>
+
+<form method="post" action="/admin/chats/{{ user.id }}/send" class="stack chat-compose">
+  <label>Сообщение пользователю
+    <textarea name="text" rows="4" required placeholder="Текст уйдёт в личку бота MAX"></textarea>
+  </label>
+  <button type="submit">Отправить в бот</button>
+</form>
+{% endblock %}

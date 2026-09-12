@@ -13,6 +13,7 @@
       <th>Этап</th>
       <th>Материалы</th>
       <th>Последний контакт</th>
+      <th></th>
     </tr>
   </thead>
   <tbody>
@@ -32,9 +33,10 @@
       <td>{{ u.state }}</td>
       <td>{{ "да" if u.materials_sent else "нет" }}</td>
       <td>{{ u.last_interaction_at }}</td>
+      <td><a href="/admin/chats/{{ u.id }}">Чат</a></td>
     </tr>
   {% else %}
-    <tr><td colspan="8" class="muted">Пользователей пока нет</td></tr>
+    <tr><td colspan="9" class="muted">Пользователей пока нет</td></tr>
   {% endfor %}
   </tbody>
 </table>

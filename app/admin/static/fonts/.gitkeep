@@ -1,0 +1,2 @@
+# Шрифты для PDF (опционально). На Windows используется Arial,
+# в Docker — пакет fonts-dejavu-core.

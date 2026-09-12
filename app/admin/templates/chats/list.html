@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Чаты</h1>
+<p class="muted">Переписка с пользователями через бота. Можно открыть чат и из карточки пользователя.</p>
+<table>
+  <thead>
+    <tr>
+      <th>Пользователь</th>
+      <th>Platform ID</th>
+      <th>Последнее сообщение</th>
+      <th>Непрочитано</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for t in threads %}
+    <tr>
+      <td>{{ t.user.name or "—" }}</td>
+      <td>{{ t.user.platform_user_id }}</td>
+      <td class="muted">
+        {% if t.last_message.direction == 'outbound' %}Вы: {% endif %}
+        {{ t.last_message.text[:80] }}{% if t.last_message.text|length > 80 %}…{% endif %}
+      </td>
+      <td>{% if t.unread %}<strong>{{ t.unread }}</strong>{% else %}0{% endif %}</td>
+      <td><a href="/admin/chats/{{ t.user.id }}">Открыть</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="muted">Пока нет переписки. Напишите пользователю из его карточки или дождитесь сообщения в бот.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

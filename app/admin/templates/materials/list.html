@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Материалы</h1>
+<p class="muted">Можно скачать материал в PDF или Word.</p>
 <table>
   <thead>
     <tr><th>Порядок</th><th>Название</th><th>Тип</th><th>Активен</th><th></th></tr>
@@ -12,7 +13,11 @@
       <td>{{ m.title }}</td>
       <td>{{ m.content_type }}</td>
       <td>{{ "да" if m.is_active else "нет" }}</td>
-      <td><a href="/admin/materials/{{ m.id }}">Редактировать</a></td>
+      <td class="row-actions">
+        <a href="/admin/materials/{{ m.id }}">Редактировать</a>
+        <a href="/admin/materials/{{ m.id }}/export.pdf">PDF</a>
+        <a href="/admin/materials/{{ m.id }}/export.docx">Word</a>
+      </td>
     </tr>
   {% endfor %}
   </tbody>

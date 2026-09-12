@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin.deps import db_session, render, require_admin, set_flash
 from app.db.models import Material, MaterialType
+from app.services.material_export import (
+    content_disposition,
+    export_material_docx,
+    export_material_pdf,
+    safe_filename,
+)
 
 router = APIRouter(
     prefix="/materials",
@@ -52,6 +58,55 @@ async def edit_material_page(
         title=f"Материал: {row.title}",
         material=row,
         types=list(MaterialType),
+    )
+
+
+@router.get("/{material_id}/export.docx")
+async def export_docx(
+    material_id: int,
+    _: str = Depends(require_admin),
+    session: AsyncSession = Depends(db_session),
+):
+    row = await session.get(Material, material_id)
+    if not row:
+        return RedirectResponse("/admin/materials", status_code=303)
+    data = export_material_docx(row)
+    return Response(
+        content=data,
+        media_type=(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ),
+        headers={
+            "Content-Disposition": content_disposition(
+                safe_filename(row.title, "docx"), row.id, "docx"
+            )
+        },
+    )
+
+
+@router.get("/{material_id}/export.pdf")
+async def export_pdf(
+    material_id: int,
+    request: Request,
+    _: str = Depends(require_admin),
+    session: AsyncSession = Depends(db_session),
+):
+    row = await session.get(Material, material_id)
+    if not row:
+        return RedirectResponse("/admin/materials", status_code=303)
+    try:
+        data = export_material_pdf(row)
+    except FileNotFoundError as exc:
+        set_flash(request, str(exc), "error")
+        return RedirectResponse(f"/admin/materials/{material_id}", status_code=303)
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": content_disposition(
+                safe_filename(row.title, "pdf"), row.id, "pdf"
+            )
+        },
     )
 
 

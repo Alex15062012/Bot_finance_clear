@@ -192,7 +192,7 @@ async def seed_content(session: AsyncSession) -> None:
         (2, "materials", "Получить полезные материалы"),
         (3, "question", "Задать финансовый вопрос"),
         (4, "help", "Справка по боту"),
-        (90, "admin", "Веб-админка (только для владельца)"),
+        (90, "admin", "Панель управления ботом"),
     ]:
         await _ensure_bot_command(session, name=name, description=description, sort_order=order)
 

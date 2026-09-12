@@ -2,6 +2,12 @@
 {% block content %}
 <p><a href="/admin/materials">← К списку</a></p>
 <h1>{{ material.title }}</h1>
+
+<p class="row-actions" style="margin-bottom:1.2rem">
+  <a class="btn-secondary" href="/admin/materials/{{ material.id }}/export.pdf">Скачать PDF</a>
+  <a class="btn-secondary" href="/admin/materials/{{ material.id }}/export.docx">Скачать Word</a>
+</p>
+
 <form method="post" action="/admin/materials/{{ material.id }}" class="stack">
   <label>Название
     <input type="text" name="title" value="{{ material.title }}" required>
