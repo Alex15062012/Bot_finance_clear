@@ -12,10 +12,16 @@
   <dt>Username</dt><dd>{{ user.username or "—" }}</dd>
   <dt>Platform ID</dt><dd>{{ user.platform_user_id }}</dd>
   <dt>Источник</dt><dd>{{ user.source or "—" }}</dd>
-  <dt>Администратор бота</dt>
+  <dt>Администратор</dt>
   <dd>
     {% if user.is_admin %}
       <span class="status-ok">да</span>
+      {% if panel_account %}
+        · логин панели: <code>{{ panel_account.username }}</code>
+        {% if not panel_account.is_active %}
+          <span class="error">(вход отключён)</span>
+        {% endif %}
+      {% endif %}
     {% else %}
       нет
     {% endif %}
@@ -53,16 +59,41 @@
 
 <section class="panel" style="margin-top:1.5rem">
   <h2>Права администратора</h2>
-  <p class="muted">Админ бота получает ссылку на веб-панель по команде <code>/admin</code>.</p>
+  <p class="muted">
+    Администратор получает команду <code>/admin</code> в боте и логин/пароль для входа в эту панель.
+  </p>
+
   {% if user.is_admin %}
-  <form method="post" action="/admin/users/{{ user.id }}/admin">
+  <form method="post" action="/admin/users/{{ user.id }}/admin/password" class="stack">
+    <label>Логин для панели
+      <input type="text" name="login" value="{{ panel_account.username if panel_account else suggested_login }}" required autocomplete="off">
+    </label>
+    <label>Новый пароль
+      <input type="password" name="password" required minlength="6" autocomplete="new-password">
+    </label>
+    <label>Повтор пароля
+      <input type="password" name="password_confirm" required minlength="6" autocomplete="new-password">
+    </label>
+    <button type="submit">Сохранить логин и пароль</button>
+  </form>
+  <form method="post" action="/admin/users/{{ user.id }}/admin" style="margin-top:1rem">
     <input type="hidden" name="is_admin" value="0">
     <button type="submit">Снять роль администратора</button>
   </form>
   {% else %}
-  <form method="post" action="/admin/users/{{ user.id }}/admin">
+  <form method="post" action="/admin/users/{{ user.id }}/admin" class="stack">
     <input type="hidden" name="is_admin" value="1">
-    <button type="submit">Назначить администратором</button>
+    <label>Логин для панели
+      <input type="text" name="login" value="{{ suggested_login }}" required autocomplete="off">
+      <small class="muted">Латиница, цифры, _ . - (от 3 символов)</small>
+    </label>
+    <label>Пароль
+      <input type="password" name="password" required minlength="6" autocomplete="new-password">
+    </label>
+    <label>Повтор пароля
+      <input type="password" name="password_confirm" required minlength="6" autocomplete="new-password">
+    </label>
+    <button type="submit">Назначить администратором и создать пароль</button>
   </form>
   {% endif %}
 </section>

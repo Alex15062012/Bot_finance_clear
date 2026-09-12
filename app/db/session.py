@@ -71,3 +71,15 @@ async def init_db() -> None:
             "is_admin",
             "is_admin BOOLEAN DEFAULT FALSE",
         )
+        await _ensure_column(
+            conn,
+            "admin_users",
+            "bot_user_id",
+            "bot_user_id INTEGER",
+        )
+        await _ensure_column(
+            conn,
+            "admin_users",
+            "platform_user_id",
+            "platform_user_id BIGINT",
+        )

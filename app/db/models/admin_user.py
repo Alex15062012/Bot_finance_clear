@@ -52,6 +52,9 @@ class AdminUser(Base):
     username: Mapped[str] = mapped_column(String(64), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Связь с пользователем бота (если учётка создана при назначении админом)
+    bot_user_id: Mapped[int | None] = mapped_column(index=True)
+    platform_user_id: Mapped[int | None] = mapped_column(index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

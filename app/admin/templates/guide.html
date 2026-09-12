@@ -90,10 +90,10 @@
 <section class="panel" id="admin-in-bot">
   <h2>5. Команда /admin в боте</h2>
   <ol>
-    <li>Назначьте человека администратором в <strong>Пользователи → карточка → «Назначить администратором»</strong>
-        <em>или</em> добавьте его MAX <code>user_id</code> в <code>ADMIN_PLATFORM_USER_IDS</code> в <code>.env</code> (несколько через запятую).</li>
+    <li>Откройте <strong>Пользователи → карточка</strong> и назначьте администратором: сразу задайте <strong>логин и пароль</strong> для входа в эту панель.</li>
+    <li>Либо добавьте MAX <code>user_id</code> в <code>ADMIN_PLATFORM_USER_IDS</code> в <code>.env</code> (несколько через запятую) — тогда /admin в боте будет доступен без учётки панели.</li>
     <li>В <code>.env</code> укажите публичный адрес панели: <code>ADMIN_PUBLIC_URL</code> (на сервере — не localhost).</li>
-    <li>В боте команда <code>/admin</code> пришлёт ссылку на панель и кнопку «Открыть админку».</li>
+    <li>В боте команда <code>/admin</code> пришлёт ссылку на панель; войти можно логином/паролем, созданными при назначении.</li>
   </ol>
   <p class="muted">Если доступа нет, бот напишет ваш MAX user_id — его нужно добавить как администратора.</p>
 </section>
