@@ -5,6 +5,7 @@ import re
 
 from app.admin_access import admin_public_url, is_bot_admin
 from app.db.models import UserState
+from app.max_api.client import inline_keyboard, link_button
 from app.max_api.types import extract_chat_id, extract_message_text, extract_user
 from app.scenarios.base import Scenario, ScenarioContext
 from app.scenarios.materials import MaterialsScenario
@@ -100,6 +101,8 @@ class MenuScenario(Scenario):
                 "получить материалы": "materials",
                 "получить полезные материалы": "materials",
                 "задать вопрос": "question",
+                "админ": "admin",
+                "админка": "admin",
             }
             for btn in buttons:
                 aliases[btn.title.strip().lower()] = (btn.payload or "").removeprefix(
@@ -229,20 +232,49 @@ class MenuScenario(Scenario):
 
     async def _send_admin_link(self, ctx: ScenarioContext, platform_user_id: int) -> None:
         if not is_bot_admin(platform_user_id):
-            await ctx.messaging.safe_send_templated(
+            logger.warning(
+                "admin denied for platform_user_id=%s (not in ADMIN_PLATFORM_USER_IDS)",
                 platform_user_id,
-                "bot_main_menu",
-                variables={"name": "друг"},
-                button_codes=await self._menu_buttons(ctx),
             )
+            text = (
+                "Нет доступа к веб-админке.\n\n"
+                f"Ваш MAX user_id: `{platform_user_id}`\n\n"
+                "Добавьте его в `ADMIN_PLATFORM_USER_IDS` в `.env` на сервере "
+                "(несколько админов через запятую: `5600001,18473332`) "
+                "и перезапустите бота."
+            )
+            try:
+                await ctx.messaging._send(platform_user_id, text)  # noqa: SLF001
+            except Exception:
+                logger.exception("Failed to send admin deny hint")
             return
+
         url = admin_public_url()
+        if "localhost" in url or "127.0.0.1" in url:
+            text = (
+                "Админка доступна только по публичному URL сервера.\n\n"
+                f"Сейчас в настройках: {url}\n\n"
+                "Укажите `ADMIN_PUBLIC_URL=http://IP_ИЛИ_ДОМЕН:8000/admin` в `.env` "
+                "и перезапустите контейнер/сервис `web`."
+            )
+            try:
+                await ctx.messaging._send(platform_user_id, text)  # noqa: SLF001
+            except Exception:
+                logger.exception("Failed to send admin localhost hint")
+            return
+
         text = (
-            f"Веб-админка для управления текстами, меню и обращениями:\n{url}\n\n"
-            "Войдите логином/паролем из настроек сервера (.env)."
+            "Веб-админка для управления текстами, меню и обращениями:\n"
+            f"{url}\n\n"
+            "Войдите логином и паролем из `.env` (`ADMIN_USERNAME` / `ADMIN_PASSWORD`)."
         )
+        attachments = [inline_keyboard([[link_button("Открыть админку", url)]])]
         try:
-            await ctx.api.send_message_to_user(platform_user_id, text)
+            await ctx.messaging._send(  # noqa: SLF001
+                platform_user_id,
+                text,
+                attachments=attachments,
+            )
         except Exception:
             logger.exception("Failed to send admin link")
 

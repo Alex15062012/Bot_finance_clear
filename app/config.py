@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     admin_password: str = "admin123"
     admin_secret_key: str = "dev-secret-change-me"
     admin_enabled: bool = True
-    # MAX user_id владельцев (через запятую) — для команды /admin в боте
+    # MAX user_id администраторов через запятую (несколько через ",")
     admin_platform_user_ids: str = ""
     admin_public_url: str = "http://localhost:8000/admin"
 
