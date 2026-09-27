@@ -122,6 +122,16 @@ button[type="submit"] {
   width: fit-content;
   font-weight: 600;
 }
+button.btn-danger[type="submit"] {
+  background: #fff;
+  color: var(--danger);
+  border: 1px solid #e0b8b8;
+  padding: 0.4rem 0.75rem;
+  width: auto;
+}
+button.btn-danger[type="submit"]:hover {
+  background: #f8e8e8;
+}
 .checkbox {
   display: flex;
   align-items: center;
@@ -171,6 +181,110 @@ button[type="submit"] {
   font-weight: 600;
 }
 .btn-secondary:hover { background: #e0eae2; }
+.attach-card {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 1rem 1.05rem 1.05rem;
+  background: #fffdf8;
+}
+.attach-head h2 { margin: 0; font-size: 1.05rem; }
+.attach-head p { margin: 0.25rem 0 0; }
+.attach-empty {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.55rem;
+  background: #f6f3ec;
+  color: var(--muted);
+}
+.file-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.file-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: #fff;
+}
+.file-card:has(input:checked) {
+  background: #f8e8e8;
+  border-color: #e0b8b8;
+}
+.file-badge {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-radius: 0.35rem;
+  padding: 0.28rem 0.4rem;
+}
+.file-meta {
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+  flex: 1;
+}
+.file-meta a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  text-decoration: none;
+}
+.file-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--danger);
+  white-space: nowrap;
+}
+.file-remove input { width: auto; padding: 0; }
+.file-drop {
+  position: relative;
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border: 1.5px dashed #b7c9bc;
+  border-radius: 0.65rem;
+  background: #f4faf6;
+  cursor: pointer;
+  font-weight: 500;
+}
+.file-drop:hover { background: #e8f5ee; border-color: var(--accent); }
+.file-drop-title { font-weight: 700; color: var(--accent); }
+form.stack label.file-drop {
+  display: grid;
+  font-weight: 500;
+}
+form.stack label.file-drop input.file-drop-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  opacity: 0;
+}
+.file-cards,
+ul.file-cards {
+  list-style: none;
+}
 
 .chat-thread {
   display: flex;

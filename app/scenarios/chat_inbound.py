@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from app.db.models import UserState
 from app.max_api.types import (
     extract_chat_id,
     extract_message_id,
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class ChatInboundScenario(Scenario):
-    """Пишет в chat_messages любые текстовые сообщения (не команды)."""
+    """Пишет в чат обычные сообщения. Ответ на «Задать вопрос» сюда не попадает."""
 
     code = "chat_inbound"
 
@@ -44,6 +45,8 @@ class ChatInboundScenario(Scenario):
             source="chat",
             dialog_chat_id=extract_chat_id(update),
         )
+        if user.state == UserState.AWAITING_QUESTION.value:
+            return False
 
         chat = ChatService(ctx.session)
         row = await chat.add_inbound(

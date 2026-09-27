@@ -6,6 +6,8 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Material, MaterialType
+from app.db.models.material_file import MaterialFile
+from app.services.material_files import file_path, list_files
 from app.max_api.client import (
     MaxApiClient,
     MaxApiError,
@@ -169,6 +171,12 @@ class MessagingService:
         elif content_type == MaterialType.IMAGE.value and material.url:
             attachments = [{"type": "image", "payload": {"url": material.url}}]
 
+        pdfs = await list_files(self.session, material.id)
+        uploaded = await self._pdf_attachments(pdfs)
+        file_attachments = [item for _, item in uploaded]
+        if file_attachments:
+            attachments = (attachments or []) + file_attachments
+
         try:
             return await self._send(
                 user_id,
@@ -179,13 +187,55 @@ class MessagingService:
         except MaxApiError:
             # Markdown иногда ломает отправку — повтор без format
             logger.warning("Material send with markdown failed, retry plain text")
-            return await self._send(
-                user_id,
-                text.replace("**", ""),
-                attachments=attachments,
-                format=None,
-                chat_id=chat_id,
-            )
+            try:
+                return await self._send(
+                    user_id,
+                    text.replace("**", ""),
+                    attachments=attachments,
+                    format=None,
+                    chat_id=chat_id,
+                )
+            except MaxApiError:
+                logger.warning("Material with files failed, sending text then files separately")
+                result = await self._send(
+                    user_id,
+                    text.replace("**", ""),
+                    format=None,
+                    chat_id=chat_id,
+                )
+                for pdf, item in uploaded:
+                    await self._send(
+                        user_id,
+                        pdf.original_name,
+                        attachments=[item],
+                        format=None,
+                        chat_id=chat_id,
+                    )
+                return result
+
+    async def _pdf_attachments(
+        self, pdfs: list[MaterialFile]
+    ) -> list[tuple[MaterialFile, dict[str, Any]]]:
+        attachments: list[tuple[MaterialFile, dict[str, Any]]] = []
+        for pdf in pdfs:
+            path = file_path(pdf)
+            if not path.is_file():
+                logger.warning("PDF missing on disk: %s", path)
+                continue
+            token = pdf.max_token
+            if not token:
+                try:
+                    token = await self.api.upload_file(
+                        pdf.original_name,
+                        path.read_bytes(),
+                    )
+                except Exception:
+                    logger.exception("Failed to upload PDF %s", pdf.original_name)
+                    continue
+                pdf.max_token = token
+                await self.session.flush()
+            attachments.append((pdf, {"type": "file", "payload": {"token": token}}))
+        return attachments
 
     async def safe_send_templated(self, *args: Any, **kwargs: Any) -> dict[str, Any] | None:
         try:

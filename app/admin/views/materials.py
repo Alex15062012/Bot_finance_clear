@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,7 @@ from app.services.material_export import (
     export_material_pdf,
     safe_filename,
 )
+from app.services.material_files import add_pdf, delete_files, file_path, list_files
 
 router = APIRouter(
     prefix="/materials",
@@ -51,6 +52,7 @@ async def edit_material_page(
     if not row:
         set_flash(request, "Материал не найден", "error")
         return RedirectResponse("/admin/materials", status_code=303)
+    files = await list_files(session, row.id)
     return render(
         request,
         "materials/edit.html",
@@ -58,6 +60,7 @@ async def edit_material_page(
         title=f"Материал: {row.title}",
         material=row,
         types=list(MaterialType),
+        files=files,
     )
 
 
@@ -110,6 +113,44 @@ async def export_pdf(
     )
 
 
+@router.get("/{material_id}/files/{file_id}")
+async def download_material_file(
+    material_id: int,
+    file_id: int,
+    _: str = Depends(require_admin),
+    session: AsyncSession = Depends(db_session),
+):
+    files = await list_files(session, material_id)
+    row = next((item for item in files if item.id == file_id), None)
+    if not row:
+        return RedirectResponse(f"/admin/materials/{material_id}", status_code=303)
+    path = file_path(row)
+    if not path.is_file():
+        return RedirectResponse(f"/admin/materials/{material_id}", status_code=303)
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=row.original_name,
+    )
+
+
+@router.post("/{material_id}/files/{file_id}/delete")
+async def delete_material_file(
+    material_id: int,
+    file_id: int,
+    request: Request,
+    _: str = Depends(require_admin),
+    session: AsyncSession = Depends(db_session),
+):
+    removed = await delete_files(session, material_id, [file_id])
+    await session.commit()
+    if removed:
+        set_flash(request, "PDF удалён")
+    else:
+        set_flash(request, "Файл не найден", "error")
+    return RedirectResponse(f"/admin/materials/{material_id}", status_code=303)
+
+
 @router.post("/{material_id}")
 async def save_material(
     material_id: int,
@@ -123,6 +164,8 @@ async def save_material(
     url: str = Form(""),
     sort_order: int = Form(0),
     is_active: str | None = Form(None),
+    delete_file_ids: list[int] = Form(default=[]),
+    pdfs: list[UploadFile] = File(default=[]),
 ):
     row = await session.get(Material, material_id)
     if not row:
@@ -134,6 +177,21 @@ async def save_material(
         set_flash(request, "Некорректный тип", "error")
         return RedirectResponse(f"/admin/materials/{material_id}", status_code=303)
 
+    prepared: list[tuple[str, bytes]] = []
+    for upload in pdfs:
+        if not upload.filename:
+            continue
+        data = await upload.read()
+        if not data:
+            continue
+        from app.services.material_files import validate_pdf
+
+        error = validate_pdf(upload.filename, data)
+        if error:
+            set_flash(request, error, "error")
+            return RedirectResponse(f"/admin/materials/{material_id}", status_code=303)
+        prepared.append((upload.filename, data))
+
     row.title = title.strip()
     row.description = description.strip() or None
     row.content_type = content_type
@@ -141,6 +199,10 @@ async def save_material(
     row.url = url.strip() or None
     row.sort_order = sort_order
     row.is_active = is_active == "on"
+    await delete_files(session, row.id, delete_file_ids)
+    for filename, data in prepared:
+        await add_pdf(session, row.id, filename, data)
     await session.commit()
-    set_flash(request, "Материал сохранён")
+    extra = f" Добавлено PDF: {len(prepared)}." if prepared else ""
+    set_flash(request, f"Материал сохранён.{extra}")
     return RedirectResponse(f"/admin/materials/{row.id}", status_code=303)

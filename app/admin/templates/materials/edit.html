@@ -8,7 +8,7 @@
   <a class="btn-secondary" href="/admin/materials/{{ material.id }}/export.docx">Скачать Word</a>
 </p>
 
-<form method="post" action="/admin/materials/{{ material.id }}" class="stack">
+<form method="post" action="/admin/materials/{{ material.id }}" class="stack" enctype="multipart/form-data">
   <label>Название
     <input type="text" name="title" value="{{ material.title }}" required>
   </label>
@@ -25,6 +25,47 @@
   <label>Контент / текст
     <textarea name="content" rows="6">{{ material.content or '' }}</textarea>
   </label>
+
+  <section class="attach-card">
+    <div class="attach-head">
+      <h2>Вложенные PDF</h2>
+      <p class="muted">Уходят пользователю вместе с текстом. Можно прикрепить несколько файлов.</p>
+    </div>
+    {% if files %}
+    <ul class="file-cards">
+      {% for f in files %}
+      <li class="file-card">
+        <span class="file-badge" aria-hidden="true">PDF</span>
+        <div class="file-meta">
+          <a href="/admin/materials/{{ material.id }}/files/{{ f.id }}">{{ f.original_name }}</a>
+          <span class="muted">
+            {% if f.size_bytes >= 1048576 %}
+              {{ (f.size_bytes / 1048576)|round(1) }} МБ
+            {% else %}
+              {{ (f.size_bytes / 1024)|round(0)|int }} КБ
+            {% endif %}
+          </span>
+        </div>
+        <button
+          type="submit"
+          class="btn-danger"
+          formaction="/admin/materials/{{ material.id }}/files/{{ f.id }}/delete"
+          formmethod="post"
+          formnovalidate
+        >Удалить</button>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="attach-empty">Пока нет вложений</p>
+    {% endif %}
+    <label class="file-drop">
+      <input class="file-drop-input" type="file" name="pdfs" accept="application/pdf,.pdf" multiple>
+      <span class="file-drop-title">Добавить PDF</span>
+      <span class="muted">Нажмите и выберите файлы · несколько сразу · до 20 МБ каждый</span>
+    </label>
+  </section>
+
   <label>URL
     <input type="text" name="url" value="{{ material.url or '' }}">
   </label>

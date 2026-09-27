@@ -45,6 +45,8 @@ services:
       MAX_CA_BUNDLE: certs/ca-bundle.pem
     ports:
       - "${ADMIN_HOST_PORT:-8000}:8000"
+    volumes:
+      - materials_data:/app/data/materials
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/admin/login"]
       interval: 15s
@@ -68,6 +70,9 @@ services:
       APP_ENV: production
       DATABASE_URL: postgresql+asyncpg://bot:bot@db:5432/bot_uv
       MAX_CA_BUNDLE: certs/ca-bundle.pem
+    volumes:
+      - materials_data:/app/data/materials
 
 volumes:
   pgdata:
+  materials_data:

@@ -37,9 +37,15 @@ def extract_chat_id(update: dict[str, Any]) -> int | None:
 
 def extract_message_text(update: dict[str, Any]) -> str | None:
     message = update.get("message") or {}
-    body = message.get("body") or {}
-    text = body.get("text")
-    return text if isinstance(text, str) else None
+    body = message.get("body") if isinstance(message.get("body"), dict) else {}
+    for candidate in (
+        body.get("text") if isinstance(body, dict) else None,
+        message.get("text"),
+        update.get("text"),
+    ):
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate
+    return None
 
 
 def extract_message_id(update: dict[str, Any]) -> str | None:

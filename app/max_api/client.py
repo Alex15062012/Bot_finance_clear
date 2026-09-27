@@ -200,6 +200,64 @@ class MaxApiClient:
     async def get_upload_url(self, upload_type: str) -> dict[str, Any]:
         return await self._request("POST", "/uploads", params={"type": upload_type})
 
+    async def upload_file(
+        self,
+        filename: str,
+        content: bytes,
+        *,
+        upload_type: str = "file",
+        mime: str = "application/pdf",
+    ) -> str:
+        """Загружает файл в MAX и возвращает token для вложения type=file."""
+        meta = await self.get_upload_url(upload_type)
+        if not isinstance(meta, dict) or not meta.get("url"):
+            raise MaxApiError("MAX не вернул URL загрузки файла", body=meta)
+
+        upload_url = str(meta["url"])
+        token = _extract_upload_token(meta)
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=10.0, read=120.0, write=120.0, pool=10.0),
+            verify=resolve_verify(self._settings),
+        ) as uploader:
+            response = await uploader.post(
+                upload_url,
+                files={"data": (filename, content, mime)},
+            )
+        if response.status_code >= 400:
+            raise MaxApiError(
+                f"Загрузка файла в MAX не удалась: {response.status_code}",
+                status_code=response.status_code,
+                body=response.text,
+            )
+        uploaded_token = None
+        if response.content:
+            try:
+                uploaded_token = _extract_upload_token(response.json())
+            except ValueError:
+                uploaded_token = None
+        token = uploaded_token or token
+        if not token:
+            raise MaxApiError(
+                "MAX не вернул token файла",
+                status_code=response.status_code,
+                body=response.text,
+            )
+        return token
+
+
+def _extract_upload_token(payload: Any) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    token = payload.get("token")
+    if isinstance(token, str) and token:
+        return token
+    retval = payload.get("retval")
+    if isinstance(retval, dict):
+        nested = retval.get("token")
+        if isinstance(nested, str) and nested:
+            return nested
+    return None
+
 
 def inline_keyboard(rows: list[list[dict[str, Any]]]) -> dict[str, Any]:
     return {"type": "inline_keyboard", "payload": {"buttons": rows}}

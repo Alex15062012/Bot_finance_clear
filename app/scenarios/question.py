@@ -53,35 +53,41 @@ class QuestionScenario(Scenario):
         if user.state != UserState.AWAITING_QUESTION.value:
             return False
 
-        message_id = extract_message_id(update)
-        lead, created = await ctx.leads.create_if_new(
-            user_id=user.id,
-            question=text.strip(),
-            source="materials_funnel",
-            platform_message_id=message_id,
-        )
-        if not created:
-            logger.info("Duplicate lead for message %s", message_id)
-            return True
-
-        await ctx.events.track(
-            "question_received",
-            user_id=user.id,
-            platform_user_id=platform_user_id,
-            payload={"lead_id": lead.id},
-        )
-        await ctx.events.track(
-            "lead_created",
-            user_id=user.id,
-            platform_user_id=platform_user_id,
-            payload={"lead_id": lead.id, "status": lead.status},
-        )
-        await ctx.users.set_state(user, UserState.QUESTION_RECEIVED)
-
-        await ctx.messaging.safe_send_templated(
-            platform_user_id,
-            "question_received_ack",
-            variables={"name": user.name or ""},
-            button_codes=await ctx.content.get_menu_button_codes(),
-        )
+        await save_question(ctx, user, platform_user_id, text.strip())
         return True
+
+
+async def save_question(ctx: ScenarioContext, user, platform_user_id: int, text: str) -> None:
+    """Сохраняет текст вопроса в обращения админки и подтверждает пользователю."""
+    message_id = extract_message_id(ctx.update)
+    lead, created = await ctx.leads.create_if_new(
+        user_id=user.id,
+        question=text.strip(),
+        source="question_request",
+        platform_message_id=message_id,
+    )
+    if not created:
+        logger.info("Duplicate lead for message %s", message_id)
+        return
+
+    await ctx.events.track(
+        "question_received",
+        user_id=user.id,
+        platform_user_id=platform_user_id,
+        payload={"lead_id": lead.id},
+    )
+    await ctx.events.track(
+        "lead_created",
+        user_id=user.id,
+        platform_user_id=platform_user_id,
+        payload={"lead_id": lead.id, "status": lead.status},
+    )
+    await ctx.users.set_state(user, UserState.QUESTION_RECEIVED)
+    logger.info("Lead #%s saved from user %s", lead.id, platform_user_id)
+
+    await ctx.messaging.safe_send_templated(
+        platform_user_id,
+        "question_received_ack",
+        variables={"name": user.name or ""},
+        button_codes=await ctx.content.get_menu_button_codes(),
+    )

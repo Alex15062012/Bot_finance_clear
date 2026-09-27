@@ -133,13 +133,13 @@ async def seed_content(session: AsyncSession) -> None:
         title="Вступление перед материалами (опционально)",
         text="Отправляю полезные материалы:",
     )
-    await _upsert_message(
+    await _ensure_message(
         session,
         code="bot_main_menu",
         title="Главное меню бота",
         text=MAIN_MENU_TEXT,
     )
-    await _upsert_message(
+    await _ensure_message(
         session,
         code="bot_help",
         title="Справка",
@@ -246,24 +246,6 @@ async def _ensure_message(
     session.add(MessageTemplate(code=code, title=title, text=text, version=1))
 
 
-async def _upsert_message(
-    session: AsyncSession, *, code: str, title: str, text: str
-) -> None:
-    """Обновляет служебные тексты меню (подсказка про «/» и т.п.)."""
-    result = await session.execute(
-        select(MessageTemplate).where(MessageTemplate.code == code)
-    )
-    row = result.scalar_one_or_none()
-    if row:
-        if row.text != text or row.title != title:
-            row.title = title
-            row.text = text
-            row.version = int(row.version or 1) + 1
-            row.is_active = True
-        return
-    session.add(MessageTemplate(code=code, title=title, text=text, version=1))
-
-
 async def _ensure_button(
     session: AsyncSession,
     *,
@@ -276,11 +258,7 @@ async def _ensure_button(
     sort_order: int,
 ) -> None:
     result = await session.execute(select(Button).where(Button.code == code))
-    row = result.scalar_one_or_none()
-    if row:
-        # Кнопки меню всегда возвращаем в активное состояние при старте
-        if code.startswith("menu_") and not row.is_active:
-            row.is_active = True
+    if result.scalar_one_or_none():
         return
     session.add(
         Button(
@@ -307,11 +285,10 @@ async def _ensure_material(
 ) -> None:
     result = await session.execute(
         select(Material).where(
-            Material.title == title,
-            Material.sort_order == sort_order,
+            (Material.title == title) | (Material.sort_order == sort_order)
         )
     )
-    if result.scalar_one_or_none():
+    if result.scalars().first():
         return
     session.add(
         Material(

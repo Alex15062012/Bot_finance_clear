@@ -9,6 +9,7 @@ from app.max_api.client import inline_keyboard, link_button
 from app.max_api.types import extract_chat_id, extract_message_text, extract_user
 from app.scenarios.base import Scenario, ScenarioContext
 from app.scenarios.materials import MaterialsScenario
+from app.scenarios.question import save_question
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,14 @@ class MenuScenario(Scenario):
         if not text:
             return False
 
+        # Пока ждём вопрос, обычный текст не перехватываем — его сохранит QuestionScenario.
+        if not text.strip().startswith("/"):
+            user_data = extract_user(ctx.update)
+            if user_data and not user_data.get("is_bot"):
+                waiting = await ctx.users.get_by_platform_id(int(user_data["user_id"]))
+                if waiting and waiting.state == UserState.AWAITING_QUESTION.value:
+                    return False
+
         parsed = parse_command(text)
         if not parsed:
             normalized = text.strip().lower()
@@ -150,7 +159,10 @@ class MenuScenario(Scenario):
             await self._give_materials(ctx, platform_user_id)
             return True
         if cmd == "question":
-            await self._ask_question(ctx, user, platform_user_id)
+            if args:
+                await save_question(ctx, user, platform_user_id, args)
+            else:
+                await self._ask_question(ctx, user, platform_user_id)
             return True
         if cmd == "admin":
             await self._send_admin_link(ctx, user, platform_user_id)

@@ -5,6 +5,7 @@ from app.db.models.consent import Consent, ConsentDocument
 from app.db.models.event import Event
 from app.db.models.lead import LEAD_STATUS_LABELS, Lead, LeadStatus
 from app.db.models.material import Material, MaterialType
+from app.db.models.material_file import MaterialFile
 from app.db.models.message import MessageTemplate
 from app.db.models.processed_update import ProcessedUpdate
 from app.db.models.setting import Setting
@@ -26,6 +27,7 @@ __all__ = [
     "Lead",
     "LeadStatus",
     "Material",
+    "MaterialFile",
     "MaterialType",
     "MessageTemplate",
     "ProcessedUpdate",

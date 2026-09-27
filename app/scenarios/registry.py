@@ -15,7 +15,7 @@ def build_scenarios() -> list[Scenario]:
         BotLifecycleScenario(),
         NewSubscriberScenario(),
         MaterialsScenario(),
+        QuestionScenario(),
         MenuScenario(),
         ChatInboundScenario(),
-        QuestionScenario(),
     ]
