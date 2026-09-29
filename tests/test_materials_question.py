@@ -112,6 +112,10 @@ async def test_question_after_one_material_opened(session: AsyncSession):
             "payload": f"material:{material.id}",
             "user": {"user_id": 2, "name": "Борис"},
         },
+        "message": {
+            "sender": {"user_id": 999, "name": "Бот", "is_bot": True},
+            "recipient": {"chat_id": 50, "chat_type": "dialog"},
+        },
     }
     assert await scenario.handle(_ctx(session, messaging, update)) is True
     assert messaging.materials == [material.id]

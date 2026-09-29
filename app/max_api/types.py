@@ -4,16 +4,22 @@ from typing import Any
 
 
 def extract_user(update: dict[str, Any]) -> dict[str, Any] | None:
+    """Кто совершил действие.
+
+    У message_callback автор кнопки — callback.user.
+    message.sender в этом событии — бот, который прислал клавиатуру.
+    """
+    callback = update.get("callback") or {}
+    if isinstance(callback, dict):
+        clicked_by = callback.get("user")
+        if isinstance(clicked_by, dict) and clicked_by.get("user_id") is not None:
+            return clicked_by
     if "user" in update and isinstance(update["user"], dict):
         return update["user"]
     message = update.get("message") or {}
     sender = message.get("sender")
     if isinstance(sender, dict):
         return sender
-    callback = update.get("callback") or {}
-    user = callback.get("user")
-    if isinstance(user, dict):
-        return user
     return None
 
 

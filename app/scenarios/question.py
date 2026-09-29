@@ -70,28 +70,40 @@ async def save_question(ctx: ScenarioContext, user, platform_user_id: int, text:
         source="question_request",
         platform_message_id=message_id,
     )
-    if not created:
+    if created:
+        await ctx.events.track(
+            "question_received",
+            user_id=user.id,
+            platform_user_id=platform_user_id,
+            payload={"lead_id": lead.id},
+        )
+        await ctx.events.track(
+            "lead_created",
+            user_id=user.id,
+            platform_user_id=platform_user_id,
+            payload={"lead_id": lead.id, "status": lead.status},
+        )
+        await ctx.users.set_state(user, UserState.QUESTION_RECEIVED)
+        logger.info("Lead #%s saved from user %s", lead.id, platform_user_id)
+    else:
         logger.info("Duplicate lead for message %s", message_id)
-        return
 
-    await ctx.events.track(
-        "question_received",
-        user_id=user.id,
-        platform_user_id=platform_user_id,
-        payload={"lead_id": lead.id},
-    )
-    await ctx.events.track(
-        "lead_created",
-        user_id=user.id,
-        platform_user_id=platform_user_id,
-        payload={"lead_id": lead.id, "status": lead.status},
-    )
-    await ctx.users.set_state(user, UserState.QUESTION_RECEIVED)
-    logger.info("Lead #%s saved from user %s", lead.id, platform_user_id)
-
-    await ctx.messaging.safe_send_templated(
+    ack = await ctx.messaging.safe_send_templated(
         platform_user_id,
         "question_received_ack",
         variables={"name": user.name or ""},
         button_codes=await ctx.content.get_menu_button_codes(),
+        chat_id=user.dialog_chat_id,
     )
+    if ack is None:
+        logger.error("question_received_ack was not sent to %s", platform_user_id)
+        try:
+            await ctx.messaging._send(  # noqa: SLF001
+                platform_user_id,
+                "Спасибо! Я получила ваш вопрос и зафиксировала обращение.\n\n"
+                "Скоро вернусь к вам с ответом или предложением короткой встречи.",
+                format=None,
+                chat_id=user.dialog_chat_id,
+            )
+        except Exception:
+            logger.exception("Question ack fallback failed for %s", platform_user_id)
