@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -13,9 +14,12 @@ from app.max_api.client import (
     MaxApiError,
     callback_button,
     inline_keyboard,
+    is_attachment_not_ready,
     link_button,
     message_button,
 )
+
+_FILE_READY_DELAYS = (0.8, 1.6, 3.2, 5.0, 8.0)
 from app.services.content import ContentService
 from app.services.templates import render_template
 from app.services.users import UserService
@@ -43,6 +47,7 @@ class MessagingService:
         attachments: list[dict[str, Any]] | None = None,
         format: str | None = "markdown",
         chat_id: int | None = None,
+        link: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         В личку MAX надёжнее слать по dialog chat_id.
@@ -56,13 +61,20 @@ class MessagingService:
 
         if resolved_chat_id:
             try:
+                chat_kwargs: dict[str, Any] = {
+                    "attachments": attachments,
+                    "format": format,
+                }
+                if link:
+                    chat_kwargs["link"] = link
                 return await self.api.send_message_to_chat(
                     resolved_chat_id,
                     text,
-                    attachments=attachments,
-                    format=format,
+                    **chat_kwargs,
                 )
             except MaxApiError as exc:
+                if is_attachment_not_ready(exc):
+                    raise
                 logger.warning(
                     "send by chat_id=%s failed (%s), fallback to user_id=%s: %s",
                     resolved_chat_id,
@@ -71,11 +83,16 @@ class MessagingService:
                     exc.body,
                 )
 
+        user_kwargs: dict[str, Any] = {
+            "attachments": attachments,
+            "format": format,
+        }
+        if link:
+            user_kwargs["link"] = link
         return await self.api.send_message_to_user(
             platform_user_id,
             text,
-            attachments=attachments,
-            format=format,
+            **user_kwargs,
         )
 
     async def send_templated(
@@ -177,6 +194,50 @@ class MessagingService:
         if file_attachments:
             attachments = (attachments or []) + file_attachments
 
+        plain = text.replace("**", "")
+        if file_attachments:
+            try:
+                return await self._send_when_files_ready(
+                    user_id,
+                    text,
+                    attachments=attachments,
+                    chat_id=chat_id,
+                    format="markdown",
+                )
+            except MaxApiError as exc:
+                if is_attachment_not_ready(exc):
+                    raise
+                logger.warning("Material send with markdown failed, retry plain text")
+                try:
+                    return await self._send_when_files_ready(
+                        user_id,
+                        plain,
+                        attachments=attachments,
+                        chat_id=chat_id,
+                        format=None,
+                    )
+                except MaxApiError as exc2:
+                    if is_attachment_not_ready(exc2):
+                        raise
+                    logger.warning(
+                        "Material with files failed, sending text then files separately"
+                    )
+                    result = await self._send(
+                        user_id,
+                        plain,
+                        format=None,
+                        chat_id=chat_id,
+                    )
+                    for pdf, item in uploaded:
+                        await self._send_when_files_ready(
+                            user_id,
+                            pdf.original_name,
+                            attachments=[item],
+                            chat_id=chat_id,
+                            format=None,
+                        )
+                    return result
+
         try:
             return await self._send(
                 user_id,
@@ -185,33 +246,44 @@ class MessagingService:
                 chat_id=chat_id,
             )
         except MaxApiError:
-            # Markdown иногда ломает отправку — повтор без format
             logger.warning("Material send with markdown failed, retry plain text")
+            return await self._send(
+                user_id,
+                plain,
+                attachments=attachments,
+                format=None,
+                chat_id=chat_id,
+            )
+
+    async def _send_when_files_ready(
+        self,
+        user_id: int,
+        text: str,
+        *,
+        attachments: list[dict[str, Any]],
+        chat_id: int | None,
+        format: str | None,
+    ) -> dict[str, Any]:
+        """Повторяет отправку, пока MAX не закончит обработку PDF."""
+        for attempt, delay in enumerate((*_FILE_READY_DELAYS, None)):
             try:
                 return await self._send(
                     user_id,
-                    text.replace("**", ""),
+                    text,
                     attachments=attachments,
-                    format=None,
+                    format=format,
                     chat_id=chat_id,
                 )
-            except MaxApiError:
-                logger.warning("Material with files failed, sending text then files separately")
-                result = await self._send(
-                    user_id,
-                    text.replace("**", ""),
-                    format=None,
-                    chat_id=chat_id,
+            except MaxApiError as exc:
+                if delay is None or not is_attachment_not_ready(exc):
+                    raise
+                logger.warning(
+                    "PDF ещё обрабатывается в MAX, повтор %s через %.1f с",
+                    attempt + 1,
+                    delay,
                 )
-                for pdf, item in uploaded:
-                    await self._send(
-                        user_id,
-                        pdf.original_name,
-                        attachments=[item],
-                        format=None,
-                        chat_id=chat_id,
-                    )
-                return result
+                await asyncio.sleep(delay)
+        raise RuntimeError("file send retry loop exited without a result")
 
     async def _pdf_attachments(
         self, pdfs: list[MaterialFile]

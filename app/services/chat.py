@@ -4,12 +4,35 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.chat_message import ChatDirection, ChatMessage
+from app.db.models.lead import Lead
 from app.db.models.user import User
 
 
 class ChatService:
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    async def can_user_write(self, user_id: int) -> bool:
+        """Писать в чат можно после сообщения админа или после финансового вопроса."""
+        outbound = await self.session.scalar(
+            select(ChatMessage.id)
+            .where(
+                ChatMessage.user_id == user_id,
+                ChatMessage.direction == ChatDirection.OUTBOUND.value,
+            )
+            .limit(1)
+        )
+        if outbound is not None:
+            return True
+        lead = await self.session.scalar(
+            select(Lead.id)
+            .where(
+                Lead.user_id == user_id,
+                Lead.source == "question_request",
+            )
+            .limit(1)
+        )
+        return lead is not None
 
     async def add_inbound(
         self,

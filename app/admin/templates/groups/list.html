@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row-actions" style="margin-bottom:0.4rem">
+  <h1 style="margin:0">Группы</h1>
+  <form method="post" action="/admin/groups/refresh">
+    <button type="submit" class="btn-secondary">Обновить</button>
+  </form>
+</div>
+<p class="muted">Куда бота добавили администратором. «Обновить» проверяет каналы и группы в MAX и заполняет таблицу. Личные диалоги сюда не попадают.</p>
+<table>
+  <thead>
+    <tr>
+      <th>ID группы / канала</th>
+      <th>Название</th>
+      <th>Тип</th>
+      <th>Ссылка</th>
+      <th>Кто добавил</th>
+      <th>ID добавившего</th>
+      <th>Статус</th>
+      <th>Участники</th>
+      <th>Когда</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for g in groups %}
+    <tr>
+      <td><code>{{ g.platform_chat_id }}</code></td>
+      <td>{{ g.title or "—" }}</td>
+      <td>{{ g.type_label }}</td>
+      <td>
+        {% if g.link %}
+          <a href="{{ g.link }}" target="_blank" rel="noopener">{{ g.link }}</a>
+        {% else %}
+          —
+        {% endif %}
+      </td>
+      <td>{{ g.added_by_name or "—" }}{% if g.added_by_username %} <span class="muted">@{{ g.added_by_username }}</span>{% endif %}</td>
+      <td>{% if g.added_by_user_id %}<code>{{ g.added_by_user_id }}</code>{% else %}—{% endif %}</td>
+      <td>
+        {% if g.status == 'removed' %}
+          <span class="error">{{ g.status_label }}</span>
+        {% else %}
+          <span class="status-ok">{{ g.status_label }}</span>
+        {% endif %}
+      </td>
+      <td>{{ g.participants_count if g.participants_count is not none else "—" }}</td>
+      <td>{{ g.added_at_label }}</td>
+    </tr>
+  {% else %}
+    <tr>
+      <td colspan="9" class="muted">Пока пусто. Нажмите «Обновить» или добавьте бота администратором в группу или канал.</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

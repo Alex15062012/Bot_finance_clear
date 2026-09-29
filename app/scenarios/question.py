@@ -30,8 +30,12 @@ class QuestionScenario(Scenario):
         if not text or not text.strip():
             return False
 
-        # Игнорируем служебные команды
+        # Команды и подписи кнопок меню не являются текстом вопроса.
         if text.strip().startswith("/"):
+            return False
+        from app.scenarios.menu import resolve_menu_text
+
+        if await resolve_menu_text(ctx.content, text):
             return False
 
         platform_user_id = int(user_data["user_id"])

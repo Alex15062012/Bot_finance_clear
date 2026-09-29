@@ -19,6 +19,7 @@ UPDATE_TYPES = [
     "user_added",
     "user_removed",
     "bot_added",
+    "bot_removed",
     "message_callback",
 ]
 

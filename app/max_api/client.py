@@ -45,6 +45,22 @@ class MaxApiError(Exception):
         self.body = body
 
 
+def is_attachment_not_ready(exc: BaseException) -> bool:
+    """MAX ещё обрабатывает файл: token есть, но вложение слать рано."""
+    if not isinstance(exc, MaxApiError):
+        return False
+    body = exc.body
+    if isinstance(body, dict):
+        blob = f"{body.get('code', '')} {body.get('message', '')}"
+    else:
+        blob = str(body or "")
+    blob = f"{blob} {exc}".lower()
+    return (
+        "attachment.not.ready" in blob
+        or "attachment.file.not.processed" in blob
+    )
+
+
 class MaxApiClient:
     """Тонкий адаптер к MAX Bot API. Бизнес-логика сюда не попадает."""
 
@@ -91,6 +107,9 @@ class MaxApiClient:
     async def get_me(self) -> dict[str, Any]:
         return await self._request("GET", "/me")
 
+    async def get_chat(self, chat_id: int) -> dict[str, Any]:
+        return await self._request("GET", f"/chats/{chat_id}")
+
     async def set_my_commands(self, commands: list[dict[str, str]]) -> dict[str, Any]:
         """PATCH /me/commands — меню команд бота (до 32 шт.)."""
         return await self._request(
@@ -123,12 +142,15 @@ class MaxApiClient:
         *,
         attachments: list[dict[str, Any]] | None = None,
         format: str | None = "markdown",
+        link: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         body: dict[str, Any] = {"text": text}
         if format:
             body["format"] = format
         if attachments:
             body["attachments"] = attachments
+        if link:
+            body["link"] = link
         return await self._request(
             "POST",
             "/messages",
@@ -143,12 +165,15 @@ class MaxApiClient:
         *,
         attachments: list[dict[str, Any]] | None = None,
         format: str | None = "markdown",
+        link: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         body: dict[str, Any] = {"text": text}
         if format:
             body["format"] = format
         if attachments:
             body["attachments"] = attachments
+        if link:
+            body["link"] = link
         return await self._request(
             "POST",
             "/messages",

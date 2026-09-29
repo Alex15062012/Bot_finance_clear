@@ -48,6 +48,20 @@ def extract_message_text(update: dict[str, Any]) -> str | None:
     return None
 
 
+def sent_message_mid(result: Any) -> str | None:
+    """mid отправленного сообщения из ответа POST /messages."""
+    if not isinstance(result, dict):
+        return None
+    message = result.get("message") if isinstance(result.get("message"), dict) else result
+    if not isinstance(message, dict):
+        return None
+    body = message.get("body") if isinstance(message.get("body"), dict) else {}
+    mid = body.get("mid") if isinstance(body, dict) else None
+    if mid is None:
+        mid = message.get("mid") or message.get("id")
+    return str(mid) if mid else None
+
+
 def extract_message_id(update: dict[str, Any]) -> str | None:
     message = update.get("message") or {}
     body = message.get("body") or {}

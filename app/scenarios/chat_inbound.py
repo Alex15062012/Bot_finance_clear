@@ -49,6 +49,15 @@ class ChatInboundScenario(Scenario):
             return False
 
         chat = ChatService(ctx.session)
+        if not await chat.can_user_write(user.id):
+            await ctx.messaging.safe_send_templated(
+                platform_user_id,
+                "chat_locked",
+                variables={"name": user.name or ""},
+                button_codes=await ctx.content.get_menu_button_codes(),
+            )
+            return True
+
         row = await chat.add_inbound(
             user_id=user.id,
             platform_user_id=platform_user_id,

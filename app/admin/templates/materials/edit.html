@@ -63,6 +63,7 @@
       <input class="file-drop-input" type="file" name="pdfs" accept="application/pdf,.pdf" multiple>
       <span class="file-drop-title">Добавить PDF</span>
       <span class="muted">Нажмите и выберите файлы · несколько сразу · до 20 МБ каждый</span>
+      <span class="file-drop-chosen muted" hidden></span>
     </label>
   </section>
 
@@ -78,4 +79,18 @@
   </label>
   <button type="submit">Сохранить</button>
 </form>
+<script>
+document.querySelectorAll(".file-drop-input").forEach(function (input) {
+  input.addEventListener("change", function () {
+    var box = input.closest(".file-drop");
+    var out = box && box.querySelector(".file-drop-chosen");
+    if (!out) return;
+    var names = Array.prototype.map.call(input.files || [], function (file) {
+      return file.name;
+    });
+    out.hidden = names.length === 0;
+    out.textContent = names.length ? "Выбрано: " + names.join(", ") : "";
+  });
+});
+</script>
 {% endblock %}

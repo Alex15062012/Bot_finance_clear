@@ -122,6 +122,14 @@ button[type="submit"] {
   width: fit-content;
   font-weight: 600;
 }
+button.btn-secondary[type="submit"] {
+  background: #eef3ef;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 0.45rem 0.8rem;
+  width: auto;
+}
+button.btn-secondary[type="submit"]:hover { background: #e0eae2; }
 button.btn-danger[type="submit"] {
   background: #fff;
   color: var(--danger);
@@ -272,14 +280,21 @@ form.stack label.file-drop {
 }
 form.stack label.file-drop input.file-drop-input {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
   border: 0;
   opacity: 0;
+  cursor: pointer;
+  font-size: 0;
+  z-index: 2;
+}
+.file-drop-chosen {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
 }
 .file-cards,
 ul.file-cards {

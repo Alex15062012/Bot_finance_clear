@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.db.base import Base
-from app.db.models import Lead, UserState
+from app.db.models import Button, Lead, UserState
 from app.scenarios.base import ScenarioContext
 from app.scenarios.question import QuestionScenario
 from app.services.content import ContentService
@@ -60,3 +60,41 @@ async def test_waiting_user_text_becomes_lead(session: AsyncSession):
     assert lead.user_id == user.id
     assert lead.status == "new"
     assert user.state == UserState.QUESTION_RECEIVED.value
+
+
+@pytest.mark.asyncio
+async def test_menu_button_title_is_not_a_lead(session: AsyncSession):
+    session.add(
+        Button(
+            code="menu_home",
+            title="☰ Меню",
+            action_type="message",
+            payload="/start",
+            scenario="menu",
+            is_active=True,
+            sort_order=1,
+        )
+    )
+    await session.flush()
+    users = UserService(session)
+    user, _ = await users.get_or_create(7, name="Евгений")
+    await users.set_state(user, UserState.AWAITING_QUESTION)
+    ctx = ScenarioContext(
+        session=session,
+        api=None,  # type: ignore[arg-type]
+        update={
+            "update_type": "message_created",
+            "message": {
+                "sender": {"user_id": 7, "name": "Евгений"},
+                "body": {"text": "☰ Меню", "mid": "mid-menu"},
+            },
+        },
+        users=users,
+        content=ContentService(session),
+        events=EventService(session),
+        leads=LeadService(session),
+        messaging=_Messaging(),  # type: ignore[arg-type]
+    )
+    assert await QuestionScenario().handle(ctx) is False
+    assert (await session.execute(select(Lead))).scalar_one_or_none() is None
+    assert user.state == UserState.AWAITING_QUESTION.value

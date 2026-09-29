@@ -60,6 +60,7 @@ NAV = [
     {"href": "/admin/leads", "label": "Обращения", "section": "leads"},
     {"href": "/admin/materials", "label": "Материалы", "section": "materials"},
     {"href": "/admin/chats", "label": "Чаты", "section": "chats"},
+    {"href": "/admin/groups", "label": "Группы", "section": "groups"},
     {"href": "/admin/settings", "label": "Настройки", "section": "settings"},
     {"href": "/admin/users", "label": "Пользователи", "section": "users"},
     {"href": "/admin/guide", "label": "Инструкция", "section": "guide"},

@@ -4,10 +4,14 @@ import logging
 from datetime import datetime, timezone
 
 from app.config import get_settings
-from app.db.models import UserState
-from app.max_api.client import MaxApiError
-from app.max_api.types import extract_chat_id, extract_user
+from sqlalchemy import select
+
+from app.db.models import Material, UserState
+from app.db.models.user_material_delivery import UserMaterialDelivery
+from app.max_api.client import MaxApiError, callback_button, inline_keyboard
+from app.max_api.types import extract_chat_id, extract_user, sent_message_mid
 from app.scenarios.base import Scenario, ScenarioContext
+from app.services.templates import render_template
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +23,8 @@ class MaterialsScenario(Scenario):
 
     async def handle(self, ctx: ScenarioContext) -> bool:
         update = ctx.update
+        if update.get("update_type") == "message_callback":
+            return await self._on_material_open(ctx)
         if update.get("update_type") != "bot_started":
             return False
 
@@ -56,88 +62,232 @@ class MaterialsScenario(Scenario):
             platform_user_id=platform_user_id,
             payload={"payload": payload},
         )
-        await ctx.users.set_state(user, UserState.BOT_OPENED)
-
         await ctx.events.track(
             "materials_requested",
             user_id=user.id,
             platform_user_id=platform_user_id,
         )
         user.materials_request_pending = False
-        await ctx.users.set_state(user, UserState.MATERIALS_REQUESTED)
+        if user.state not in {
+            UserState.AWAITING_QUESTION.value,
+            UserState.QUESTION_RECEIVED.value,
+        }:
+            await ctx.users.set_state(user, UserState.MATERIALS_REQUESTED)
 
-        # Автовыдача только при первой выдаче
-        if user.materials_sent:
-            logger.info(
-                "Materials already sent for user %s — skip auto resend",
-                platform_user_id,
-            )
-            if user.state != UserState.QUESTION_RECEIVED.value:
-                await ctx.messaging.safe_send_templated(
-                    platform_user_id,
-                    "question_request",
-                    variables={"name": user.name or ""},
-                    button_codes=await ctx.content.get_menu_button_codes(),
-                )
-                await ctx.users.set_state(user, UserState.AWAITING_QUESTION)
-            return True
-
-        return await self._deliver_materials(ctx, user, platform_user_id)
+        return await self._offer_materials(ctx, user, platform_user_id)
 
     async def deliver_again(self, ctx: ScenarioContext, platform_user_id: int) -> bool:
         """Отдельное действие повторной выдачи (кнопка меню /materials)."""
         user = await ctx.users.get_by_platform_id(platform_user_id)
         if not user:
             return False
-        return await self._deliver_materials(
-            ctx, user, platform_user_id, force=True, action="materials_resend"
+        return await self._offer_materials(
+            ctx, user, platform_user_id, action="materials_resend"
         )
 
-    async def _deliver_materials(
+    async def _offer_materials(
         self,
         ctx: ScenarioContext,
         user,
         platform_user_id: int,
         *,
-        force: bool = False,
         action: str = "materials_sent",
     ) -> bool:
+        """Список материалов. Повторно список не отправляем."""
+        if user.materials_sent:
+            await self._remind_already_sent(
+                ctx,
+                platform_user_id,
+                user.dialog_chat_id,
+                user.materials_list_message_id,
+                "Вы уже ранее получили материалы. Они в сообщении, на которое отвечает это уведомление.",
+            )
+            return True
+
         materials = await ctx.content.get_active_materials()
         if not materials:
             logger.warning("No active materials configured")
             return True
 
-        try:
-            chat_id = user.dialog_chat_id
-            for material in materials:
-                await ctx.messaging.send_material(
-                    platform_user_id,
-                    material,
-                    chat_id=chat_id,
-                )
+        template = await ctx.content.get_message("materials_choose")
+        if template:
+            text = render_template(template.text, {"name": user.name or ""})
+        else:
+            text = "Выберите материал. Финансовый вопрос появится после того, как вы откроете один из них."
 
-            followup = await ctx.messaging.safe_send_templated(
+        rows: list[list[dict]] = []
+        for material in materials:
+            title = (material.title or f"Материал {material.id}").strip()
+            rows.append([callback_button(title[:120], f"material:{material.id}")])
+        rows.extend(await self._menu_rows(ctx))
+
+        try:
+            sent = await ctx.messaging._send(  # noqa: SLF001
                 platform_user_id,
-                "question_request",
-                variables={"name": user.name or ""},
-                button_codes=await ctx.content.get_menu_button_codes(),
-                chat_id=chat_id,
+                text,
+                attachments=[inline_keyboard(rows)],
+                chat_id=user.dialog_chat_id,
             )
-            if followup is None:
-                logger.error("question_request failed for user %s", platform_user_id)
         except MaxApiError:
-            logger.exception("Failed to deliver materials to %s", platform_user_id)
+            logger.exception("Failed to offer materials to %s", platform_user_id)
             return True
 
-        if force or not user.materials_sent:
-            user.materials_sent = True
-            user.materials_sent_at = datetime.now(timezone.utc)
-
-        await ctx.users.set_state(user, UserState.AWAITING_QUESTION)
+        user.materials_sent = True
+        user.materials_sent_at = datetime.now(timezone.utc)
+        user.materials_list_message_id = sent_message_mid(sent)
+        if user.state not in {
+            UserState.AWAITING_QUESTION.value,
+            UserState.QUESTION_RECEIVED.value,
+        }:
+            await ctx.users.set_state(user, UserState.MATERIALS_SENT)
         await ctx.events.track(
             action,
             user_id=user.id,
             platform_user_id=platform_user_id,
-            payload={"count": len(materials), "force": force},
+            payload={"count": len(materials)},
         )
         return True
+
+    async def _on_material_open(self, ctx: ScenarioContext) -> bool:
+        callback = ctx.update.get("callback") or {}
+        payload = str(callback.get("payload") or "")
+        if not payload.startswith("material:"):
+            return False
+
+        callback_id = callback.get("callback_id")
+        if callback_id:
+            try:
+                await ctx.api.answer_callback(str(callback_id))
+            except Exception as exc:
+                logger.warning(
+                    "answer_callback failed: %s body=%s",
+                    exc,
+                    getattr(exc, "body", None),
+                )
+
+        raw_id = payload.split(":", 1)[1]
+        try:
+            material_id = int(raw_id)
+        except ValueError:
+            return True
+
+        material = await ctx.session.get(Material, material_id)
+        user_data = extract_user(ctx.update)
+        if not user_data or not material or not material.is_active:
+            return True
+
+        platform_user_id = int(user_data["user_id"])
+        user, _ = await ctx.users.get_or_create(
+            platform_user_id,
+            name=user_data.get("name") or user_data.get("first_name"),
+            username=user_data.get("username"),
+            source="material_open",
+            dialog_chat_id=extract_chat_id(ctx.update),
+        )
+        previous = await self._delivery(ctx, user.id, material.id)
+        if previous:
+            await self._remind_already_sent(
+                ctx,
+                platform_user_id,
+                user.dialog_chat_id,
+                previous.message_mid,
+                f"Вы уже ранее получили материал «{material.title}». "
+                "Он в сообщении, на которое отвечает это уведомление.",
+            )
+            return True
+
+        try:
+            sent = await ctx.messaging.send_material(
+                platform_user_id,
+                material,
+                chat_id=user.dialog_chat_id,
+            )
+        except MaxApiError:
+            logger.exception(
+                "Failed to send material %s to %s", material_id, platform_user_id
+            )
+            return True
+
+        ctx.session.add(
+            UserMaterialDelivery(
+                user_id=user.id,
+                material_id=material.id,
+                message_mid=sent_message_mid(sent),
+            )
+        )
+        await ctx.session.flush()
+        await ctx.events.track(
+            "material_opened",
+            user_id=user.id,
+            platform_user_id=platform_user_id,
+            payload={"material_id": material.id},
+        )
+        if user.state in {
+            UserState.AWAITING_QUESTION.value,
+            UserState.QUESTION_RECEIVED.value,
+        }:
+            return True
+
+        followup = await ctx.messaging.safe_send_templated(
+            platform_user_id,
+            "question_request",
+            variables={"name": user.name or ""},
+            button_codes=await ctx.content.get_menu_button_codes(),
+            chat_id=user.dialog_chat_id,
+        )
+        if followup is None:
+            logger.error("question_request failed for user %s", platform_user_id)
+            return True
+        await ctx.users.set_state(user, UserState.AWAITING_QUESTION)
+        return True
+
+    async def _delivery(
+        self, ctx: ScenarioContext, user_id: int, material_id: int
+    ) -> UserMaterialDelivery | None:
+        return (
+            await ctx.session.execute(
+                select(UserMaterialDelivery).where(
+                    UserMaterialDelivery.user_id == user_id,
+                    UserMaterialDelivery.material_id == material_id,
+                )
+            )
+        ).scalar_one_or_none()
+
+    async def _remind_already_sent(
+        self,
+        ctx: ScenarioContext,
+        platform_user_id: int,
+        chat_id: int | None,
+        message_mid: str | None,
+        text: str,
+    ) -> None:
+        link = {"type": "reply", "mid": message_mid} if message_mid else None
+        if not message_mid:
+            text = text.replace(
+                " Они в сообщении, на которое отвечает это уведомление.",
+                " Найдите их в переписке выше.",
+            ).replace(
+                " Он в сообщении, на которое отвечает это уведомление.",
+                " Найдите его в переписке выше.",
+            )
+        try:
+            await ctx.messaging._send(  # noqa: SLF001
+                platform_user_id,
+                text,
+                format=None,
+                chat_id=chat_id,
+                link=link,
+            )
+        except MaxApiError:
+            logger.exception("Failed to remind about materials for %s", platform_user_id)
+
+    async def _menu_rows(self, ctx: ScenarioContext) -> list[list[dict]]:
+        rows: list[list[dict]] = []
+        for code in await ctx.content.get_menu_button_codes():
+            button = await ctx.content.get_button(code)
+            if not button:
+                continue
+            built = await ctx.messaging._build_button(button)  # noqa: SLF001
+            if built:
+                rows.append([built])
+        return rows

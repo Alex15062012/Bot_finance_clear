@@ -8,6 +8,7 @@ from app.admin.views import (
     chats,
     commands,
     dashboard,
+    groups,
     guide,
     leads,
     materials,
@@ -25,6 +26,7 @@ admin_router.include_router(buttons.router)
 admin_router.include_router(leads.router)
 admin_router.include_router(materials.router)
 admin_router.include_router(chats.router)
+admin_router.include_router(groups.router)
 admin_router.include_router(settings.router)
 admin_router.include_router(users.router)
 admin_router.include_router(guide.router)

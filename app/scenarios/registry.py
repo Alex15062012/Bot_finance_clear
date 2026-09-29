@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.scenarios.base import Scenario
 from app.scenarios.bot_lifecycle import BotLifecycleScenario
+from app.scenarios.groups import GroupsScenario
 from app.scenarios.chat_inbound import ChatInboundScenario
 from app.scenarios.materials import MaterialsScenario
 from app.scenarios.menu import MenuScenario
@@ -12,6 +13,7 @@ from app.scenarios.question import QuestionScenario
 def build_scenarios() -> list[Scenario]:
     """Порядок важен: более специфичные сценарии раньше."""
     return [
+        GroupsScenario(),
         BotLifecycleScenario(),
         NewSubscriberScenario(),
         MaterialsScenario(),

@@ -83,3 +83,9 @@ async def init_db() -> None:
             "platform_user_id",
             "platform_user_id BIGINT",
         )
+        await _ensure_column(
+            conn,
+            "users",
+            "materials_list_message_id",
+            "materials_list_message_id VARCHAR(128)",
+        )

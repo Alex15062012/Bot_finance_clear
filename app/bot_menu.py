@@ -19,6 +19,7 @@ DEFAULT_BOT_COMMANDS: list[dict[str, str]] = [
     {"name": "materials", "description": "Получить полезные материалы"},
     {"name": "question", "description": "Задать финансовый вопрос"},
     {"name": "help", "description": "Справка по боту"},
+    {"name": "chat", "description": "Чат с администратором"},
 ]
 
 

@@ -1,4 +1,5 @@
 from app.db.models.admin_user import AdminUser
+from app.db.models.bot_group import BotGroup
 from app.db.models.bot_command import BotCommandRow
 from app.db.models.button import Button
 from app.db.models.consent import Consent, ConsentDocument
@@ -11,11 +12,13 @@ from app.db.models.processed_update import ProcessedUpdate
 from app.db.models.setting import Setting
 from app.db.models.chat_message import ChatDirection, ChatMessage
 from app.db.models.user import BOT_USAGE_STATUS_LABELS, BotUsageStatus, User, UserState
+from app.db.models.user_material_delivery import UserMaterialDelivery
 
 __all__ = [
     "AdminUser",
     "BOT_USAGE_STATUS_LABELS",
     "BotCommandRow",
+    "BotGroup",
     "BotUsageStatus",
     "Button",
     "ChatDirection",
@@ -33,5 +36,6 @@ __all__ = [
     "ProcessedUpdate",
     "Setting",
     "User",
+    "UserMaterialDelivery",
     "UserState",
 ]

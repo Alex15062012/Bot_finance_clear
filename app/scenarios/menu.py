@@ -23,6 +23,54 @@ def parse_command(text: str) -> tuple[str, str] | None:
     return match.group(1).lower(), (match.group(2) or "").strip()
 
 
+_TEXT_ALIASES = {
+    "меню": "menu",
+    "помощь": "help",
+    "получить материалы": "materials",
+    "получить полезные материалы": "materials",
+    "задать вопрос": "question",
+    "админ": "admin",
+    "админка": "admin",
+    "чат": "chat",
+}
+
+
+async def resolve_menu_text(content, text: str) -> str | None:
+    """Команда по тексту сообщения: /команда, подпись кнопки или короткий ярлык."""
+    parsed = parse_command(text)
+    if parsed:
+        return parsed[0]
+    normalized = text.strip().lower()
+    if not normalized:
+        return None
+    if normalized in _TEXT_ALIASES:
+        return _TEXT_ALIASES[normalized]
+    codes = await content.get_menu_button_codes()
+    for code in codes:
+        button = await content.get_button(code)
+        if not button or not button.title:
+            continue
+        if button.title.strip().lower() != normalized:
+            continue
+        return action_from_menu_button(button.payload, button.code)
+    return None
+
+
+def action_from_menu_button(payload: str | None, code: str | None = None) -> str | None:
+    """Команда сценария по payload кнопки. Название кнопки на это не влияет."""
+    raw = (payload or "").strip()
+    if raw.startswith("/"):
+        parsed = parse_command(raw)
+        return parsed[0] if parsed else None
+    if raw.startswith("menu:"):
+        action = raw.split(":", 1)[1].strip()
+        return action or None
+    if raw:
+        return raw
+    suffix = (code or "").removeprefix("menu_").strip()
+    return suffix or None
+
+
 class MenuScenario(Scenario):
     """Команды меню и inline-кнопки в личном чате с ботом."""
 
@@ -87,42 +135,16 @@ class MenuScenario(Scenario):
         if not text:
             return False
 
-        # Пока ждём вопрос, обычный текст не перехватываем — его сохранит QuestionScenario.
-        if not text.strip().startswith("/"):
-            user_data = extract_user(ctx.update)
-            if user_data and not user_data.get("is_bot"):
-                waiting = await ctx.users.get_by_platform_id(int(user_data["user_id"]))
-                if waiting and waiting.state == UserState.AWAITING_QUESTION.value:
-                    return False
-
         parsed = parse_command(text)
-        if not parsed:
-            normalized = text.strip().lower()
-            # Ярлыки по названиям кнопок из БД
-            buttons = []
-            for code in await self._menu_buttons(ctx):
-                btn = await ctx.content.get_button(code)
-                if btn:
-                    buttons.append(btn)
-            aliases = {
-                "меню": "menu",
-                "помощь": "help",
-                "получить материалы": "materials",
-                "получить полезные материалы": "materials",
-                "задать вопрос": "question",
-                "админ": "admin",
-                "админка": "admin",
-            }
-            for btn in buttons:
-                aliases[btn.title.strip().lower()] = (btn.payload or "").removeprefix(
-                    "menu:"
-                ) or btn.code.removeprefix("menu_")
-            cmd = aliases.get(normalized)
+        if parsed:
+            cmd, args = parsed
+        else:
+            # Обычный текст во время ожидания вопроса сохраняет QuestionScenario.
+            # Название кнопки меню (например «☰ Меню») обрабатываем здесь.
+            cmd = await resolve_menu_text(ctx.content, text)
             if not cmd:
                 return False
             args = ""
-        else:
-            cmd, args = parsed
 
         user_data = extract_user(ctx.update)
         if not user_data or user_data.get("is_bot"):
@@ -163,6 +185,9 @@ class MenuScenario(Scenario):
                 await save_question(ctx, user, platform_user_id, args)
             else:
                 await self._ask_question(ctx, user, platform_user_id)
+            return True
+        if cmd == "chat":
+            await self._open_chat(ctx, user, platform_user_id)
             return True
         if cmd == "admin":
             await self._send_admin_link(ctx, user, platform_user_id)
@@ -212,6 +237,8 @@ class MenuScenario(Scenario):
             await self._give_materials(ctx, platform_user_id)
         elif action == "question":
             await self._ask_question(ctx, user, platform_user_id)
+        elif action == "chat":
+            await self._open_chat(ctx, user, platform_user_id)
         elif action == "help":
             await ctx.messaging.safe_send_templated(
                 platform_user_id,
@@ -230,6 +257,18 @@ class MenuScenario(Scenario):
             platform_user_id,
             "bot_main_menu",
             variables={"name": user.name or "друг"},
+            button_codes=await self._menu_buttons(ctx),
+        )
+
+    async def _open_chat(self, ctx: ScenarioContext, user, platform_user_id: int) -> None:
+        from app.services.chat import ChatService
+
+        allowed = await ChatService(ctx.session).can_user_write(user.id)
+        code = "chat_open" if allowed else "chat_locked"
+        await ctx.messaging.safe_send_templated(
+            platform_user_id,
+            code,
+            variables={"name": user.name or ""},
             button_codes=await self._menu_buttons(ctx),
         )
 
@@ -292,12 +331,8 @@ class MenuScenario(Scenario):
     async def _give_materials(self, ctx: ScenarioContext, platform_user_id: int) -> None:
         materials = MaterialsScenario()
         user = await ctx.users.get_by_platform_id(platform_user_id)
-        if user and user.materials_sent:
-            await materials.deliver_again(ctx, platform_user_id)
-            return
-
         if user:
             user.materials_request_pending = False
-            await materials._deliver_materials(ctx, user, platform_user_id)  # noqa: SLF001
+            await materials._offer_materials(ctx, user, platform_user_id)  # noqa: SLF001
         else:
             await materials.deliver_again(ctx, platform_user_id)

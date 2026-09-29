@@ -62,6 +62,7 @@ class User(Base):
 
     materials_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     materials_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    materials_list_message_id: Mapped[str | None] = mapped_column(String(128))
     materials_request_pending: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Админ бота: команда /admin и ссылка на веб-панель (или через ADMIN_PLATFORM_USER_IDS)

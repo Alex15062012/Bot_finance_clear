@@ -38,7 +38,7 @@ def validate_pdf(filename: str, data: bytes) -> str | None:
         return "Пустой файл"
     if len(data) > MAX_PDF_BYTES:
         return f"«{filename}» больше 20 МБ"
-    looks_pdf = data.startswith(b"%PDF")
+    looks_pdf = b"%PDF" in data[:1024]
     named_pdf = (filename or "").lower().endswith(".pdf")
     if not looks_pdf and not named_pdf:
         return f"«{filename}» не похож на PDF"
