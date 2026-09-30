@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.db.base import Base
-from app.db.models import Material, MaterialType, UserState
+from app.db.models import Button, Material, MaterialType, UserState
 from app.scenarios.base import ScenarioContext
 from app.scenarios.materials import MaterialsScenario
 from app.services.content import ContentService
@@ -35,7 +35,7 @@ class _Messaging:
         return {"ok": True}
 
     async def _build_button(self, button):
-        return None
+        return {"text": button.title, "payload": button.payload}
 
 
 @pytest.fixture
@@ -129,6 +129,35 @@ async def test_question_after_one_material_opened(session: AsyncSession):
     assert messaging.materials == [material.id]
     assert messaging.templates == []
     assert user.state == UserState.AWAITING_QUESTION.value
+
+
+@pytest.mark.asyncio
+async def test_materials_list_hides_get_materials_button(session: AsyncSession):
+    session.add(
+        Button(
+            code="menu_materials",
+            title="Получить материалы",
+            action_type="callback",
+            payload="menu:materials",
+            is_active=True,
+            sort_order=1,
+        )
+    )
+    session.add(
+        Button(
+            code="menu_question",
+            title="Задать вопрос",
+            action_type="callback",
+            payload="menu:question",
+            is_active=True,
+            sort_order=2,
+        )
+    )
+    await session.flush()
+    messaging = _Messaging()
+    rows = await MaterialsScenario()._menu_rows(_ctx(session, messaging, {}))  # noqa: SLF001
+    titles = [row[0]["text"] for row in rows]
+    assert titles == ["Задать вопрос"]
 
 
 @pytest.mark.asyncio

@@ -238,10 +238,15 @@ class MaterialsScenario(Scenario):
         ).scalar_one_or_none()
 
     async def _menu_rows(self, ctx: ScenarioContext) -> list[list[dict]]:
+        """Кнопки меню под списком. «Получить материалы» не дублируем: материалы уже кнопки."""
+        from app.scenarios.menu import action_from_menu_button
+
         rows: list[list[dict]] = []
         for code in await ctx.content.get_menu_button_codes():
             button = await ctx.content.get_button(code)
             if not button:
+                continue
+            if action_from_menu_button(button.payload, button.code) == "materials":
                 continue
             built = await ctx.messaging._build_button(button)  # noqa: SLF001
             if built:
