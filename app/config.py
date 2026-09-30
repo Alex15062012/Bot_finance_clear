@@ -78,6 +78,14 @@ class Settings(BaseSettings):
         payload = self.materials_start_payload
         return f"https://max.ru/{username}?start={payload}"
 
+    @property
+    def question_deeplink(self) -> str:
+        """Открывает бота сразу на запросе финансового вопроса."""
+        username = self.bot_username.lstrip("@")
+        if not username:
+            return ""
+        return f"https://max.ru/{username}?start=question"
+
 
 @lru_cache
 def get_settings() -> Settings:

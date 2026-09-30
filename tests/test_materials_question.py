@@ -126,14 +126,13 @@ async def test_question_after_one_material_opened(session: AsyncSession):
     messaging.materials.clear()
     messaging.texts.clear()
     assert await scenario.handle(_ctx(session, messaging, update)) is True
-    assert messaging.materials == []
+    assert messaging.materials == [material.id]
     assert messaging.templates == []
-    assert any("уже ранее получили" in text for text in messaging.texts)
     assert user.state == UserState.AWAITING_QUESTION.value
 
 
 @pytest.mark.asyncio
-async def test_materials_list_is_not_sent_twice(session: AsyncSession):
+async def test_materials_list_is_sent_again(session: AsyncSession):
     session.add(
         Material(
             title="Где прибыль",
@@ -153,4 +152,4 @@ async def test_materials_list_is_not_sent_twice(session: AsyncSession):
     messaging.texts.clear()
     await scenario._offer_materials(ctx, user, 3)  # noqa: SLF001
     assert len(messaging.texts) == 1
-    assert "уже ранее получили материалы" in messaging.texts[0]
+    assert "уже ранее получили" not in messaging.texts[0]

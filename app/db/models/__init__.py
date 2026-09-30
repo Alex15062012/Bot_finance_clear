@@ -1,5 +1,6 @@
 from app.db.models.admin_user import AdminUser
 from app.db.models.bot_group import BotGroup
+from app.db.models.channel_broadcast import ChannelBroadcast
 from app.db.models.bot_command import BotCommandRow
 from app.db.models.button import Button
 from app.db.models.consent import Consent, ConsentDocument
@@ -19,6 +20,7 @@ __all__ = [
     "BOT_USAGE_STATUS_LABELS",
     "BotCommandRow",
     "BotGroup",
+    "ChannelBroadcast",
     "BotUsageStatus",
     "Button",
     "ChatDirection",

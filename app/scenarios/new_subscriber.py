@@ -18,13 +18,9 @@ class NewSubscriberScenario(Scenario):
         if update.get("update_type") != "user_added":
             return False
 
-        # Только канал (если указан CHANNEL_CHAT_ID — фильтруем)
-        from app.config import get_settings
-
-        settings = get_settings()
         chat_id = update.get("chat_id")
-        if settings.channel_chat_id and chat_id != settings.channel_chat_id:
-            logger.info("Skip user_added for foreign chat_id=%s", chat_id)
+        if not await _is_tracked_membership(ctx, chat_id):
+            logger.info("Skip user_added outside tracked chats chat_id=%s", chat_id)
             return True
 
         user_data = extract_user(update)
@@ -81,7 +77,11 @@ class NewSubscriberScenario(Scenario):
         user.welcome_sent = True
         user.welcome_sent_at = datetime.now(timezone.utc)
         user.welcome_message_id = str(message_id) if message_id else None
-        await ctx.users.set_state(user, UserState.WELCOME_SENT)
+        if user.state in {
+            UserState.NEW_SUBSCRIBER.value,
+            UserState.BOT_OPENED.value,
+        }:
+            await ctx.users.set_state(user, UserState.WELCOME_SENT)
         await ctx.events.track(
             "welcome_sent",
             user_id=user.id,
@@ -89,3 +89,25 @@ class NewSubscriberScenario(Scenario):
             payload={"message_id": user.welcome_message_id},
         )
         return True
+
+
+async def _is_tracked_membership(ctx: ScenarioContext, chat_id) -> bool:
+    """Новый участник канала или группы, куда бот добавлен администратором."""
+    from app.config import get_settings
+    from app.services.bot_groups import get_by_chat_id
+
+    try:
+        cid = int(chat_id)
+    except (TypeError, ValueError):
+        return False
+
+    settings = get_settings()
+    if settings.channel_chat_id and cid == int(settings.channel_chat_id):
+        return True
+
+    row = await get_by_chat_id(ctx.session, cid)
+    return (
+        row is not None
+        and row.status == "active"
+        and row.chat_type in {"chat", "channel"}
+    )

@@ -93,17 +93,7 @@ class MaterialsScenario(Scenario):
         *,
         action: str = "materials_sent",
     ) -> bool:
-        """Список материалов. Повторно список не отправляем."""
-        if user.materials_sent:
-            await self._remind_already_sent(
-                ctx,
-                platform_user_id,
-                user.dialog_chat_id,
-                user.materials_list_message_id,
-                "Вы уже ранее получили материалы. Они в сообщении, на которое отвечает это уведомление.",
-            )
-            return True
-
+        """Список материалов. При каждом запросе список отправляется заново."""
         materials = await ctx.content.get_active_materials()
         if not materials:
             logger.warning("No active materials configured")
@@ -184,18 +174,6 @@ class MaterialsScenario(Scenario):
             source="material_open",
             dialog_chat_id=extract_chat_id(ctx.update),
         )
-        previous = await self._delivery(ctx, user.id, material.id)
-        if previous:
-            await self._remind_already_sent(
-                ctx,
-                platform_user_id,
-                user.dialog_chat_id,
-                previous.message_mid,
-                f"Вы уже ранее получили материал «{material.title}». "
-                "Он в сообщении, на которое отвечает это уведомление.",
-            )
-            return True
-
         try:
             sent = await ctx.messaging.send_material(
                 platform_user_id,
@@ -208,13 +186,19 @@ class MaterialsScenario(Scenario):
             )
             return True
 
-        ctx.session.add(
-            UserMaterialDelivery(
-                user_id=user.id,
-                material_id=material.id,
-                message_mid=sent_message_mid(sent),
+        previous = await self._delivery(ctx, user.id, material.id)
+        mid = sent_message_mid(sent)
+        if previous is None:
+            ctx.session.add(
+                UserMaterialDelivery(
+                    user_id=user.id,
+                    material_id=material.id,
+                    message_mid=mid,
+                )
             )
-        )
+        else:
+            previous.message_mid = mid
+            previous.sent_at = datetime.now(timezone.utc)
         await ctx.session.flush()
         await ctx.events.track(
             "material_opened",
@@ -252,34 +236,6 @@ class MaterialsScenario(Scenario):
                 )
             )
         ).scalar_one_or_none()
-
-    async def _remind_already_sent(
-        self,
-        ctx: ScenarioContext,
-        platform_user_id: int,
-        chat_id: int | None,
-        message_mid: str | None,
-        text: str,
-    ) -> None:
-        link = {"type": "reply", "mid": message_mid} if message_mid else None
-        if not message_mid:
-            text = text.replace(
-                " Они в сообщении, на которое отвечает это уведомление.",
-                " Найдите их в переписке выше.",
-            ).replace(
-                " Он в сообщении, на которое отвечает это уведомление.",
-                " Найдите его в переписке выше.",
-            )
-        try:
-            await ctx.messaging._send(  # noqa: SLF001
-                platform_user_id,
-                text,
-                format=None,
-                chat_id=chat_id,
-                link=link,
-            )
-        except MaxApiError:
-            logger.exception("Failed to remind about materials for %s", platform_user_id)
 
     async def _menu_rows(self, ctx: ScenarioContext) -> list[list[dict]]:
         rows: list[list[dict]] = []

@@ -5,8 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.models import BotCommandRow, Button, Material, MaterialType, MessageTemplate, Setting
+from app.services.channel_broadcast import CHANNEL_QUESTION_VARIANTS
 
-WELCOME_TEXT = """{{name}}, здравствуйте! 😊 Спасибо, что подписались на мой канал.
+_LEGACY_WELCOME_TEXT = """{{name}}, здравствуйте! 😊 Спасибо, что подписались на мой канал.
 
 Хочу не просто поприветствовать Вас, а сразу быть полезной.
 
@@ -17,6 +18,14 @@ WELCOME_TEXT = """{{name}}, здравствуйте! 😊 Спасибо, чт�
 💡 Важно: материалы будут отправлены Вам не в канал, а в личный чат с ботом.
 
 После нажатия кнопки откройте бот и нажмите «Начать», если платформа попросит это сделать. После запуска бот автоматически отправит Вам материалы."""
+
+WELCOME_TEXT = """{{name}}, здравствуйте!
+
+Спасибо, что подписались.
+
+Если хотите подробнее ознакомиться с деятельностью владельца канала, перейдите в бота и получите полезные материалы. Они придут в личный чат, не в канал.
+
+Нажмите кнопку ниже."""
 
 QUESTION_REQUEST_TEXT = """А если у вас сейчас есть конкретный вопрос по бизнесу — куда уходят деньги, как планировать налоги, где теряется прибыль, стоит ли делать покупку или инвестицию, как пережить финансово сложный период, как обучить сотрудников считать, как приготовить расчеты по проекту для банка или инвестора — напишите мне прямо сюда.
 
@@ -134,6 +143,19 @@ async def seed_content(session: AsyncSession) -> None:
         title="Приветствие нового подписчика",
         text=WELCOME_TEXT,
     )
+    await _replace_message_if_unchanged(
+        session,
+        code="new_subscriber_welcome",
+        previous=_LEGACY_WELCOME_TEXT,
+        text=WELCOME_TEXT,
+    )
+    for index, variant in enumerate(CHANNEL_QUESTION_VARIANTS, start=1):
+        await _ensure_message(
+            session,
+            code=f"channel_question_{index}",
+            title=f"Приглашение в канал, вариант {index}",
+            text=variant,
+        )
     await _ensure_message(
         session,
         code="question_request",
@@ -296,6 +318,20 @@ async def _ensure_message(
     if result.scalar_one_or_none():
         return
     session.add(MessageTemplate(code=code, title=title, text=text, version=1))
+
+
+async def _replace_message_if_unchanged(
+    session: AsyncSession, *, code: str, previous: str, text: str
+) -> None:
+    """Обновляет текст, только если в базе всё ещё исходная версия."""
+    result = await session.execute(
+        select(MessageTemplate).where(MessageTemplate.code == code)
+    )
+    row = result.scalar_one_or_none()
+    if row is None or row.text != previous or previous == text:
+        return
+    row.text = text
+    row.version = (row.version or 1) + 1
 
 
 async def _ensure_button(

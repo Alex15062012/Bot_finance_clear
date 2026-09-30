@@ -14,6 +14,7 @@ from app.handlers.update_router import UpdateRouter
 from app.logging_setup import setup_logging
 from app.max_api.client import MaxApiClient
 from app.seed.content_seed import seed_content
+from app.services.channel_broadcast import send_due_broadcasts
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,23 @@ UPDATE_TYPES = [
 ]
 
 POLL_TIMEOUT_SEC = 25
+BROADCAST_CHECK_SEC = 30
+
+
+async def _broadcast_loop(api: MaxApiClient) -> None:
+    """В 10:00 и 16:00 по Москве публикует приглашение задать вопрос в каналы."""
+    while True:
+        try:
+            async with SessionLocal() as session:
+                sent = await send_due_broadcasts(session, api)
+                await session.commit()
+                if sent:
+                    logger.info("Channel invites sent: %s", sent)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Channel broadcast check failed")
+        await asyncio.sleep(BROADCAST_CHECK_SEC)
 
 
 async def run() -> None:
@@ -48,6 +66,7 @@ async def run() -> None:
         await register_bot_commands(api, session)
     router = UpdateRouter(api)
     marker: int | None = None
+    broadcast_task = asyncio.create_task(_broadcast_loop(api))
 
     logger.info("Long polling started (timeout=%ss)", POLL_TIMEOUT_SEC)
     try:
@@ -78,6 +97,7 @@ async def run() -> None:
                 async with SessionLocal() as session:
                     await router.handle(session, update)
     finally:
+        broadcast_task.cancel()
         await api.aclose()
 
 

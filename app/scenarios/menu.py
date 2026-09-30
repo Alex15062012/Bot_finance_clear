@@ -127,6 +127,9 @@ class MenuScenario(Scenario):
             platform_user_id=platform_user_id,
             payload={"payload": update_payload},
         )
+        if update_payload == "question":
+            await self._ask_question(ctx, user, platform_user_id)
+            return True
         await self._send_main_menu(ctx, user, platform_user_id)
         return True
 
