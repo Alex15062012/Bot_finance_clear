@@ -86,7 +86,11 @@ def apply_api_chat(row: BotGroup, chat: dict[str, Any]) -> bool:
 async def list_groups(session: AsyncSession) -> list[BotGroup]:
     rows = (
         await session.execute(
-            select(BotGroup).order_by(BotGroup.added_at.desc(), BotGroup.id.desc())
+            select(BotGroup).order_by(
+                BotGroup.status.asc(),
+                BotGroup.added_at.desc(),
+                BotGroup.id.desc(),
+            )
         )
     ).scalars().all()
     return list(rows)
@@ -100,17 +104,100 @@ async def get_by_chat_id(session: AsyncSession, chat_id: int) -> BotGroup | None
     ).scalar_one_or_none()
 
 
-async def _enrich(session: AsyncSession, api: Any, row: BotGroup) -> BotGroup | None:
+def _mark_removed(row: BotGroup) -> None:
+    row.status = "removed"
+    if row.removed_at is None:
+        row.removed_at = datetime.now(timezone.utc)
+
+
+def _access_lost(exc: MaxApiError) -> bool:
+    body = str(exc.body or "").lower()
+    if exc.status_code in {403, 404}:
+        return True
+    return any(
+        code in body
+        for code in (
+            "chat.not.found",
+            "chat.denied",
+            "chat.forbidden",
+            "chat.not.member",
+        )
+    )
+
+
+def _admin_user_ids(payload: Any) -> list[int] | None:
+    members: Any = payload
+    if isinstance(payload, dict):
+        members = payload.get("members") or payload.get("admins") or payload.get("users")
+    if not isinstance(members, list):
+        return None
+    ids: list[int] = []
+    for item in members:
+        if not isinstance(item, dict):
+            continue
+        user_id = item.get("user_id")
+        if user_id is None and isinstance(item.get("user"), dict):
+            user_id = item["user"].get("user_id")
+        if user_id is None:
+            continue
+        try:
+            ids.append(int(user_id))
+        except (TypeError, ValueError):
+            continue
+    return ids
+
+
+async def _bot_user_id(api: Any) -> int | None:
+    method = getattr(api, "get_me", None)
+    if method is None:
+        return None
+    try:
+        me = await method()
+    except Exception:
+        logger.exception("Не удалось прочитать профиль бота")
+        return None
+    if isinstance(me, dict) and me.get("user_id") is not None:
+        try:
+            return int(me["user_id"])
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+async def _bot_is_admin(api: Any, chat_id: int, bot_user_id: int) -> bool | None:
+    """True — бот в администраторах, False — уже нет, None — MAX не ответил определённо."""
+    method = getattr(api, "get_chat_admins", None)
+    if method is None:
+        return None
+    try:
+        payload = await method(int(chat_id))
+    except MaxApiError as exc:
+        if _access_lost(exc):
+            return False
+        return None
+    except Exception:
+        logger.exception("Не удалось прочитать администраторов чата %s", chat_id)
+        return None
+    ids = _admin_user_ids(payload)
+    if ids is None:
+        return None
+    return bot_user_id in ids
+
+
+async def _enrich(
+    session: AsyncSession,
+    api: Any,
+    row: BotGroup,
+    *,
+    bot_user_id: int | None = None,
+) -> BotGroup | None:
     if api is None:
         return row
     try:
         chat = await api.get_chat(int(row.platform_chat_id))
     except MaxApiError as exc:
-        body = str(exc.body or "")
-        if exc.status_code == 404 or "chat.not.found" in body:
-            row.status = "removed"
-            if row.removed_at is None:
-                row.removed_at = datetime.now(timezone.utc)
+        if _access_lost(exc):
+            _mark_removed(row)
             return row
         logger.warning(
             "Не удалось прочитать чат %s: %s",
@@ -127,6 +214,10 @@ async def _enrich(session: AsyncSession, api: Any, row: BotGroup) -> BotGroup | 
         await session.delete(row)
         await session.flush()
         return None
+    if row.status == "active" and bot_user_id is not None:
+        still_admin = await _bot_is_admin(api, int(row.platform_chat_id), bot_user_id)
+        if still_admin is False:
+            _mark_removed(row)
     return row
 
 
@@ -227,44 +318,21 @@ async def remember_seen_chat(
 
 
 async def refresh_groups(session: AsyncSession, api: Any) -> None:
+    """Заново читает каждый известный чат и снимает те, где бот уже не администратор."""
+    bot_user_id = await _bot_user_id(api)
     rows = await list_groups(session)
     for row in rows:
-        await _enrich(session, api, row)
+        await _enrich(session, api, row, bot_user_id=bot_user_id)
     await session.flush()
 
 
-_MEMBERSHIP_TYPES = ["bot_added", "bot_removed"]
-# Слишком старый marker MAX пропускает события, поэтому смотрим несколькими окнами.
-_LOOKBACKS = (50_000, 20_000, 5_000)
-
-
 async def sync_groups_from_api(session: AsyncSession, api: Any) -> int:
-    """Ищет каналы и группы, куда добавлен бот, и обновляет уже известные чаты."""
-    head = await api.get_updates(timeout=0, limit=1, types=_MEMBERSHIP_TYPES)
-    head_marker = int((head or {}).get("marker") or 0)
-    for update in (head or {}).get("updates") or []:
-        await _apply_membership_update(session, update)
+    """Перепроверяет права бота в уже найденных чатах.
 
-    for lookback in _LOOKBACKS:
-        start = max(0, head_marker - lookback)
-        if start == head_marker:
-            continue
-        data = await api.get_updates(
-            marker=start,
-            timeout=0,
-            limit=100,
-            types=_MEMBERSHIP_TYPES,
-        )
-        for update in (data or {}).get("updates") or []:
-            await _apply_membership_update(session, update)
-
+    Новые каналы и группы попадают в список из событий бота (добавление,
+    сообщение, новый подписчик). Повторный обход старой очереди MAX
+    пропускает события и не возвращает их, поэтому кнопка «Обновить»
+    очередь не читает.
+    """
     await refresh_groups(session, api)
     return len(await list_groups(session))
-
-
-async def _apply_membership_update(session: AsyncSession, update: dict[str, Any]) -> None:
-    kind = str(update.get("update_type") or "")
-    if kind == "bot_added":
-        await remember_bot_added(session, update, api=None)
-    elif kind == "bot_removed":
-        await remember_bot_removed(session, update, api=None)

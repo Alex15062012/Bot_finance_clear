@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Расписание публикаций</h1>
+<p class="muted">
+  Когда бот публикует в каналы приглашение задать финансовый вопрос.
+  Время — московское. Если бот был выключен в эту минуту, сообщение ещё уйдёт в течение 30 минут.
+  Тексты чередуются, их можно править в разделе «Тексты», коды <code>channel_question_1</code>…<code>channel_question_4</code>.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Когда</th>
+      <th>Повтор</th>
+      <th>День</th>
+      <th>Дата</th>
+      <th>Время</th>
+      <th>Включено</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for s in schedules %}
+    <tr>
+      <td>{{ describe_rule(s) }}</td>
+      <td colspan="6">
+        <form method="post" action="/admin/schedules/{{ s.id }}" class="row-actions">
+          <select name="mode">
+            {% for value, label in modes.items() %}
+              <option value="{{ value }}" {% if s.mode == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <select name="weekday">
+            {% for index, label in weekdays %}
+              <option value="{{ index }}" {% if s.weekday == index %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <input type="date" name="on_date" value="{{ s.on_date or '' }}">
+          <input type="time" name="send_time" value="{{ s.send_time }}" required>
+          <label class="checkbox">
+            <input type="checkbox" name="is_active" value="1" {% if s.is_active %}checked{% endif %}>
+            да
+          </label>
+          <button type="submit">Сохранить</button>
+          <button type="submit" class="btn-danger" formaction="/admin/schedules/{{ s.id }}/delete">Удалить</button>
+        </form>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="muted">Правил пока нет. Пока таблица пустая, бот публикует каждый день в 10:00 и 16:00.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Новое правило</h2>
+<form method="post" action="/admin/schedules" class="stack">
+  <label>Повтор
+    <select name="mode">
+      {% for value, label in modes.items() %}
+        <option value="{{ value }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>День недели — для варианта «День недели»
+    <select name="weekday">
+      {% for index, label in weekdays %}
+        <option value="{{ index }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Дата — для варианта «Конкретная дата»
+    <input type="date" name="on_date">
+  </label>
+  <label>Время
+    <input type="time" name="send_time" required>
+  </label>
+  <button type="submit">Добавить</button>
+</form>
+{% endblock %}

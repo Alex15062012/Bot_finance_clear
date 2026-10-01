@@ -8,14 +8,16 @@ from app.config import get_settings
 from app.db.base import Base
 from app.db.models import UserState
 from app.db.models.bot_group import BotGroup
+from app.db.models.channel_schedule import ChannelSchedule
 from app.db.models.message import MessageTemplate
 from app.max_api.client import MaxApiError
 from app.scenarios.base import ScenarioContext
+from app.scenarios.bot_lifecycle import BotLifecycleScenario
 from app.scenarios.menu import MenuScenario
 from app.scenarios.new_subscriber import NewSubscriberScenario
 from app.scenarios.registry import build_scenarios
 from app.seed.content_seed import WELCOME_TEXT, _LEGACY_WELCOME_TEXT, seed_content
-from app.services.channel_broadcast import send_due_broadcasts, slot_key
+from app.services.channel_broadcast import due_slot_keys, send_due_broadcasts
 from app.services.content import ContentService
 from app.services.events import EventService
 from app.services.leads import LeadService
@@ -94,10 +96,13 @@ async def test_new_subscriber_outside_tracked_chats_is_skipped(session):
     assert messaging.codes == []
 
 
-def test_slot_only_at_ten_and_sixteen_moscow():
-    assert slot_key(datetime(2026, 9, 30, 10, 5, tzinfo=MOSCOW)) == "2026-09-30-10"
-    assert slot_key(datetime(2026, 9, 30, 16, 0, tzinfo=MOSCOW)) == "2026-09-30-16"
-    assert slot_key(datetime(2026, 9, 30, 11, 0, tzinfo=MOSCOW)) is None
+def test_default_slots_are_ten_and_sixteen_moscow():
+    from app.services.channel_broadcast import default_rules
+
+    rules = default_rules()
+    assert due_slot_keys(datetime(2026, 9, 30, 10, 5, tzinfo=MOSCOW), rules)
+    assert due_slot_keys(datetime(2026, 9, 30, 16, 0, tzinfo=MOSCOW), rules)
+    assert due_slot_keys(datetime(2026, 9, 30, 11, 0, tzinfo=MOSCOW), rules) == []
 
 
 @pytest.mark.asyncio
@@ -125,8 +130,55 @@ async def test_channel_invite_is_sent_once_per_slot(session):
 
 
 def test_utc_morning_is_moscow_ten():
+    from app.services.channel_broadcast import default_rules
+
     utc = datetime(2026, 9, 30, 7, 0, tzinfo=timezone.utc)
-    assert slot_key(utc) == "2026-09-30-10"
+    assert due_slot_keys(utc, default_rules())
+
+
+@pytest.mark.asyncio
+async def test_weekday_and_date_rules_replace_daily_defaults(session):
+    session.add(
+        BotGroup(platform_chat_id=-100, chat_type="channel", status="active", title="Канал")
+    )
+    session.add(
+        ChannelSchedule(mode="weekday", weekday=0, send_time="10:00", is_active=True)
+    )
+    session.add(
+        ChannelSchedule(mode="date", on_date="2026-10-05", send_time="12:00", is_active=True)
+    )
+    await session.flush()
+    api = _Api()
+    wednesday = datetime(2026, 9, 30, 10, 5, tzinfo=MOSCOW)
+    assert wednesday.weekday() == 2
+    assert await send_due_broadcasts(session, api, now=wednesday) == 0
+
+    monday = datetime(2026, 9, 28, 10, 5, tzinfo=MOSCOW)
+    assert monday.weekday() == 0
+    assert await send_due_broadcasts(session, api, now=monday) == 1
+
+    once = datetime(2026, 10, 5, 12, 10, tzinfo=MOSCOW)
+    assert await send_due_broadcasts(session, api, now=once) == 1
+    assert api.chats == [-100, -100]
+
+
+@pytest.mark.asyncio
+async def test_welcome_is_sent_when_subscriber_opens_bot(session):
+    users = UserService(session)
+    user, _ = await users.get_or_create(42, name="Анна")
+    user.subscribed_at = datetime.now(timezone.utc)
+    await session.flush()
+    messaging = _Messaging()
+    update = {
+        "update_type": "bot_started",
+        "user": {"user_id": 42, "name": "Анна"},
+        "chat_id": 50,
+    }
+    ctx = _ctx(session, messaging, update)
+    ctx.users = users
+    assert await BotLifecycleScenario().handle(ctx) is False
+    assert messaging.codes == ["new_subscriber_welcome"]
+    assert user.welcome_sent is True
 
 
 @pytest.mark.asyncio

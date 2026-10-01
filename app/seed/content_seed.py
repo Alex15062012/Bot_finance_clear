@@ -4,7 +4,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.db.models import BotCommandRow, Button, Material, MaterialType, MessageTemplate, Setting
+from app.db.models import (
+    BotCommandRow,
+    Button,
+    ChannelSchedule,
+    Material,
+    MaterialType,
+    MessageTemplate,
+    Setting,
+)
 from app.services.channel_broadcast import CHANNEL_QUESTION_VARIANTS
 
 _LEGACY_WELCOME_TEXT = """{{name}}, здравствуйте! 😊 Спасибо, что подписались на мой канал.
@@ -290,7 +298,17 @@ async def seed_content(session: AsyncSession) -> None:
         sort_order=2,
     )
 
+    await _ensure_default_schedules(session)
     await session.commit()
+
+
+async def _ensure_default_schedules(session: AsyncSession) -> None:
+    """Первый запуск: каждый день в 10:00 и 16:00. Дальше админ правит сам."""
+    existing = await session.scalar(select(ChannelSchedule.id).limit(1))
+    if existing is not None:
+        return
+    session.add(ChannelSchedule(mode="daily", send_time="10:00", is_active=True))
+    session.add(ChannelSchedule(mode="daily", send_time="16:00", is_active=True))
 
 
 async def _get_setting_value(session: AsyncSession, key: str) -> str | None:

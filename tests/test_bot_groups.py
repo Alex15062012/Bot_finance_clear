@@ -120,32 +120,28 @@ async def test_dialog_message_is_ignored(session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_sync_finds_channel_and_skips_dialog(session: AsyncSession):
-    class _Api:
-        async def get_updates(self, *, marker=None, timeout=0, limit=100, types=None):
-            if marker is None:
-                return {"updates": [], "marker": 10_000}
-            if marker == 10_000 - 5_000:
-                return {
-                    "updates": [
-                        {
-                            "update_type": "bot_added",
-                            "timestamp": 1_700_000_000_000,
-                            "chat_id": 77,
-                            "is_channel": True,
-                            "user": {"user_id": 5, "name": "Анна"},
-                        },
-                        {
-                            "update_type": "bot_added",
-                            "chat_id": 88,
-                            "is_channel": False,
-                            "user": {"user_id": 6, "name": "Борис"},
-                        },
-                    ],
-                    "marker": 10_000,
-                }
-            return {"updates": [], "marker": 10_000}
+async def test_sync_keeps_channel_and_drops_dialog(session: AsyncSession):
+    await remember_bot_added(
+        session,
+        {
+            "update_type": "bot_added",
+            "timestamp": 1_700_000_000_000,
+            "chat_id": 77,
+            "is_channel": True,
+            "user": {"user_id": 5, "name": "Анна"},
+        },
+    )
+    await remember_bot_added(
+        session,
+        {
+            "update_type": "bot_added",
+            "chat_id": 88,
+            "is_channel": False,
+            "user": {"user_id": 6, "name": "Борис"},
+        },
+    )
 
+    class _Api:
         async def get_chat(self, chat_id: int) -> dict:
             if chat_id == 88:
                 return {
@@ -172,4 +168,97 @@ async def test_sync_finds_channel_and_skips_dialog(session: AsyncSession):
     assert rows[0].link == "https://max.ru/test"
     assert rows[0].participants_count == 4
     assert rows[0].added_by_name == "Анна"
+    assert rows[0].status == "active"
     assert "messages_count" not in rows[0].__table__.columns
+
+
+@pytest.mark.asyncio
+async def test_refresh_marks_chat_removed_when_bot_is_no_longer_admin(session: AsyncSession):
+    await remember_bot_added(
+        session,
+        {
+            "update_type": "bot_added",
+            "chat_id": 77,
+            "is_channel": True,
+            "user": {"user_id": 5, "name": "Анна"},
+        },
+    )
+
+    class _Api:
+        async def get_me(self) -> dict:
+            return {"user_id": 378258738, "name": "Бот"}
+
+        async def get_updates(self, *, marker=None, timeout=0, limit=100, types=None):
+            return {"updates": [], "marker": 100}
+
+        async def get_chat(self, chat_id: int) -> dict:
+            return {
+                "chat_id": chat_id,
+                "type": "channel",
+                "status": "active",
+                "title": "Старый канал",
+            }
+
+        async def get_chat_admins(self, chat_id: int) -> dict:
+            return {"members": [{"user_id": 5, "name": "Анна", "is_owner": True}]}
+
+    await sync_groups_from_api(session, _Api())
+    row = (await list_groups(session))[0]
+    assert row.platform_chat_id == 77
+    assert row.status == "removed"
+    assert row.status_label == "Бот удалён"
+
+
+@pytest.mark.asyncio
+async def test_refresh_keeps_chat_when_bot_is_still_admin(session: AsyncSession):
+    await remember_bot_added(
+        session,
+        {
+            "update_type": "bot_added",
+            "chat_id": 77,
+            "is_channel": True,
+            "user": {"user_id": 5, "name": "Анна"},
+        },
+    )
+
+    class _Api:
+        async def get_me(self) -> dict:
+            return {"user_id": 378258738}
+
+        async def get_updates(self, *, marker=None, timeout=0, limit=100, types=None):
+            return {"updates": [], "marker": 100}
+
+        async def get_chat(self, chat_id: int) -> dict:
+            return {"chat_id": chat_id, "type": "channel", "status": "active", "title": "Живой"}
+
+        async def get_chat_admins(self, chat_id: int) -> dict:
+            return {"members": [{"user_id": 378258738, "is_bot": True}]}
+
+    await sync_groups_from_api(session, _Api())
+    row = (await list_groups(session))[0]
+    assert row.status == "active"
+    assert row.title == "Живой"
+
+
+@pytest.mark.asyncio
+async def test_refresh_marks_removed_when_chat_access_is_denied(session: AsyncSession):
+    from app.max_api.client import MaxApiError
+
+    await remember_bot_added(
+        session,
+        {"update_type": "bot_added", "chat_id": 77, "is_channel": False},
+    )
+
+    class _Api:
+        async def get_me(self) -> dict:
+            return {"user_id": 1}
+
+        async def get_updates(self, *, marker=None, timeout=0, limit=100, types=None):
+            return {"updates": [], "marker": 50}
+
+        async def get_chat(self, chat_id: int) -> dict:
+            raise MaxApiError("denied", status_code=403, body="chat.denied")
+
+    await sync_groups_from_api(session, _Api())
+    row = (await list_groups(session))[0]
+    assert row.status == "removed"

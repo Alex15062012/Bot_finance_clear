@@ -53,42 +53,50 @@ class NewSubscriberScenario(Scenario):
             logger.info("Welcome already sent for user %s", platform_user_id)
             return True
 
-        name = user.name or "друг"
-        result = await ctx.messaging.safe_send_templated(
-            platform_user_id,
-            "new_subscriber_welcome",
-            variables={"name": name, "first_name": name},
-            button_codes=["useful_materials"],
-        )
-        if not result:
-            # Состояние не двигаем — возможна повторная отправка
-            logger.error("Welcome not sent for user %s — state unchanged", platform_user_id)
-            return True
-
-        message_id = None
-        if isinstance(result, dict):
-            message = result.get("message") or result
-            body = message.get("body") if isinstance(message, dict) else None
-            if isinstance(body, dict):
-                message_id = body.get("mid")
-            elif isinstance(message, dict):
-                message_id = message.get("id") or message.get("mid")
-
-        user.welcome_sent = True
-        user.welcome_sent_at = datetime.now(timezone.utc)
-        user.welcome_message_id = str(message_id) if message_id else None
-        if user.state in {
-            UserState.NEW_SUBSCRIBER.value,
-            UserState.BOT_OPENED.value,
-        }:
-            await ctx.users.set_state(user, UserState.WELCOME_SENT)
-        await ctx.events.track(
-            "welcome_sent",
-            user_id=user.id,
-            platform_user_id=platform_user_id,
-            payload={"message_id": user.welcome_message_id},
-        )
+        await deliver_materials_offer(ctx, user, platform_user_id)
         return True
+
+
+async def deliver_materials_offer(ctx: ScenarioContext, user, platform_user_id: int) -> bool:
+    """Личное предложение перейти в бота и получить материалы. False, если MAX не принял сообщение."""
+    if user.welcome_sent:
+        return False
+
+    name = user.name or "друг"
+    result = await ctx.messaging.safe_send_templated(
+        platform_user_id,
+        "new_subscriber_welcome",
+        variables={"name": name, "first_name": name},
+        button_codes=["useful_materials"],
+    )
+    if not result:
+        logger.error("Welcome not sent for user %s — state unchanged", platform_user_id)
+        return False
+
+    message_id = None
+    if isinstance(result, dict):
+        message = result.get("message") or result
+        body = message.get("body") if isinstance(message, dict) else None
+        if isinstance(body, dict):
+            message_id = body.get("mid")
+        elif isinstance(message, dict):
+            message_id = message.get("id") or message.get("mid")
+
+    user.welcome_sent = True
+    user.welcome_sent_at = datetime.now(timezone.utc)
+    user.welcome_message_id = str(message_id) if message_id else None
+    if user.state in {
+        UserState.NEW_SUBSCRIBER.value,
+        UserState.BOT_OPENED.value,
+    }:
+        await ctx.users.set_state(user, UserState.WELCOME_SENT)
+    await ctx.events.track(
+        "welcome_sent",
+        user_id=user.id,
+        platform_user_id=platform_user_id,
+        payload={"message_id": user.welcome_message_id},
+    )
+    return True
 
 
 async def _is_tracked_membership(ctx: ScenarioContext, chat_id) -> bool:

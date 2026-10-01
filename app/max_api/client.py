@@ -110,6 +110,9 @@ class MaxApiClient:
     async def get_chat(self, chat_id: int) -> dict[str, Any]:
         return await self._request("GET", f"/chats/{chat_id}")
 
+    async def get_chat_admins(self, chat_id: int) -> Any:
+        return await self._request("GET", f"/chats/{chat_id}/members/admins")
+
     async def set_my_commands(self, commands: list[dict[str, str]]) -> dict[str, Any]:
         """PATCH /me/commands — меню команд бота (до 32 шт.)."""
         return await self._request(

@@ -45,7 +45,8 @@ async def refresh_bot_groups(
         set_flash(request, "Нет подключения к MAX", "error")
         return RedirectResponse("/admin/groups", status_code=303)
     try:
-        count = await sync_groups_from_api(session, api)
+        await sync_groups_from_api(session, api)
+        rows = await list_groups(session)
         await session.commit()
     except MaxApiError:
         logger.warning("Не удалось проверить группы и каналы в MAX")
@@ -57,8 +58,13 @@ async def refresh_bot_groups(
         await session.rollback()
         set_flash(request, "Не удалось проверить чаты в MAX", "error")
         return RedirectResponse("/admin/groups", status_code=303)
-    if count:
-        set_flash(request, f"Проверка выполнена. Каналов и групп: {count}.")
+    active = sum(1 for row in rows if row.status == "active")
+    removed = sum(1 for row in rows if row.status == "removed")
+    if active:
+        text = f"Список обновлён. Бот администратор в каналах и группах: {active}."
     else:
-        set_flash(request, "Проверка выполнена. Бот не состоит ни в одной группе или канале.")
+        text = "Список обновлён. Бот сейчас не администратор ни в одной найденной группе или канале."
+    if removed:
+        text += f" Уже не администратор: {removed}."
+    set_flash(request, text)
     return RedirectResponse("/admin/groups", status_code=303)
