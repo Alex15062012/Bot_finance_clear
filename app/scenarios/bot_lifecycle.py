@@ -67,10 +67,14 @@ class BotLifecycleScenario(Scenario):
             platform_user_id=platform_user_id,
             payload={"payload": ctx.update.get("payload")},
         )
-        # Подписка на канал могла не доставить личку, пока человек не открыл бота.
-        if user.subscribed_at and not user.welcome_sent:
-            from app.scenarios.new_subscriber import deliver_materials_offer
+        from app.scenarios.new_subscriber import (
+            delete_channel_welcomes,
+            deliver_materials_offer,
+        )
 
+        await delete_channel_welcomes(ctx, platform_user_id)
+        # Личное предложение — если приветствие в канал не удалось отправить.
+        if user.subscribed_at and not user.welcome_sent:
             await deliver_materials_offer(ctx, user, platform_user_id)
         # False — дальше Materials / Menu обработают сценарий
         return False

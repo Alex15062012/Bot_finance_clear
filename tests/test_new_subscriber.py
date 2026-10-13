@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.db.base import Base
 from app.db.models import UserState
 from app.db.models.bot_group import BotGroup
+from app.db.models.channel_welcome import ChannelWelcome
 from app.db.models.channel_schedule import ChannelSchedule
 from app.db.models.message import MessageTemplate
 from app.max_api.client import MaxApiError
@@ -40,10 +41,26 @@ class _Api:
 class _Messaging:
     def __init__(self):
         self.codes: list[str] = []
+        self.chat_ids: list[int | None] = []
+        self.names: list[str] = []
+        self.buttons: list[list[str] | None] = []
 
     async def safe_send_templated(self, user_id, code, **kwargs):
         self.codes.append(code)
+        self.chat_ids.append(kwargs.get("chat_id"))
+        variables = kwargs.get("variables") or {}
+        self.names.append(variables.get("name"))
+        self.buttons.append(kwargs.get("button_codes"))
         return {"message": {"body": {"mid": "m1"}}}
+
+
+class _DeleteApi:
+    def __init__(self):
+        self.deleted: list[str] = []
+
+    async def delete_message(self, message_id: str):
+        self.deleted.append(message_id)
+        return {"success": True}
 
 
 @pytest.fixture
@@ -87,6 +104,9 @@ async def test_new_subscriber_in_tracked_channel_gets_materials_offer(session):
     messaging = _Messaging()
     assert await NewSubscriberScenario().handle(_ctx(session, messaging, _added(-100))) is True
     assert messaging.codes == ["new_subscriber_welcome"]
+    assert messaging.chat_ids == [-100]
+    assert messaging.names == ["Анна"]
+    assert messaging.buttons == [["useful_materials"]]
 
 
 @pytest.mark.asyncio
@@ -163,6 +183,46 @@ async def test_weekday_and_date_rules_replace_daily_defaults(session):
 
 
 @pytest.mark.asyncio
+async def test_channel_welcome_is_deleted_when_subscriber_opens_bot(session):
+    session.add(
+        BotGroup(platform_chat_id=-100, chat_type="channel", status="active", title="Канал")
+    )
+    await session.flush()
+    messaging = _Messaging()
+    api = _DeleteApi()
+    added = {
+        "update_type": "user_added",
+        "chat_id": -100,
+        "user": {
+            "user_id": 42,
+            "name": "Анна",
+            "username": "anna",
+            "is_bot": False,
+        },
+    }
+    ctx = _ctx(session, messaging, added)
+    ctx.api = api
+    assert await NewSubscriberScenario().handle(ctx) is True
+    assert messaging.chat_ids == [-100]
+    assert messaging.names == ["@anna"]
+
+    started = {
+        "update_type": "bot_started",
+        "chat_id": 50,
+        "user": {"user_id": 42, "name": "Анна", "username": "anna"},
+    }
+    opened = _ctx(session, messaging, started)
+    opened.api = api
+    messaging.codes.clear()
+    assert await BotLifecycleScenario().handle(opened) is False
+    assert api.deleted == ["m1"]
+    assert messaging.codes == []
+    row = (await session.execute(select(ChannelWelcome))).scalar_one()
+    assert row.deleted_at is not None
+    assert row.platform_chat_id == -100
+
+
+@pytest.mark.asyncio
 async def test_welcome_is_sent_when_subscriber_opens_bot(session):
     users = UserService(session)
     user, _ = await users.get_or_create(42, name="Анна")
@@ -217,6 +277,7 @@ async def test_group_member_gets_offer_removed_group_does_not(session):
     scenario = NewSubscriberScenario()
     assert await scenario.handle(_ctx(session, messaging, _added(-7))) is True
     assert messaging.codes == ["new_subscriber_welcome"]
+    assert messaging.chat_ids == [None]
     messaging.codes.clear()
     assert await scenario.handle(_ctx(session, messaging, _added(-8))) is True
     assert messaging.codes == []

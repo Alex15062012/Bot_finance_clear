@@ -2,6 +2,7 @@ from app.db.models.admin_user import AdminUser
 from app.db.models.bot_group import BotGroup
 from app.db.models.channel_broadcast import ChannelBroadcast
 from app.db.models.channel_schedule import ChannelSchedule
+from app.db.models.channel_welcome import ChannelWelcome
 from app.db.models.bot_command import BotCommandRow
 from app.db.models.button import Button
 from app.db.models.consent import Consent, ConsentDocument
@@ -23,6 +24,7 @@ __all__ = [
     "BotGroup",
     "ChannelBroadcast",
     "ChannelSchedule",
+    "ChannelWelcome",
     "BotUsageStatus",
     "Button",
     "ChatDirection",

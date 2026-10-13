@@ -184,6 +184,13 @@ class MaxApiClient:
             json=body,
         )
 
+    async def delete_message(self, message_id: str) -> dict[str, Any]:
+        return await self._request(
+            "DELETE",
+            "/messages",
+            params={"message_id": message_id},
+        )
+
     async def get_updates(
         self,
         *,
