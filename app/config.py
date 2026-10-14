@@ -1,3 +1,4 @@
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any
@@ -16,6 +17,13 @@ def _empty_str_to_none(value: Any) -> Any:
 
 
 OptionalInt = Annotated[int | None, BeforeValidator(_empty_str_to_none)]
+
+# https://max.ru/<ник_бота>?start=... — без ника MAX показывает «информация недоступна».
+_NAMED_BOT_LINK = re.compile(r"^https://max\.ru/[^/?#]+", re.IGNORECASE)
+
+
+def link_opens_bot(url: str | None) -> bool:
+    return bool(url and _NAMED_BOT_LINK.match(url.strip()))
 
 
 class Settings(BaseSettings):

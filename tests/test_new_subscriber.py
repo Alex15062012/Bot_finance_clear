@@ -223,6 +223,38 @@ async def test_channel_welcome_is_deleted_when_subscriber_opens_bot(session):
 
 
 @pytest.mark.asyncio
+async def test_new_subscription_posts_welcome_again(session):
+    session.add(
+        BotGroup(platform_chat_id=-100, chat_type="channel", status="active", title="Канал")
+    )
+    session.add(
+        ChannelWelcome(
+            platform_user_id=42,
+            platform_chat_id=-100,
+            message_id="old",
+            created_at=datetime.now(timezone.utc) - timedelta(minutes=10),
+        )
+    )
+    await session.flush()
+    messaging = _Messaging()
+    assert await NewSubscriberScenario().handle(_ctx(session, messaging, _added(-100))) is True
+    assert messaging.chat_ids == [-100]
+
+
+@pytest.mark.asyncio
+async def test_duplicate_subscription_does_not_post_twice(session):
+    session.add(
+        BotGroup(platform_chat_id=-100, chat_type="channel", status="active", title="Канал")
+    )
+    await session.flush()
+    messaging = _Messaging()
+    scenario = NewSubscriberScenario()
+    assert await scenario.handle(_ctx(session, messaging, _added(-100))) is True
+    assert await scenario.handle(_ctx(session, messaging, _added(-100))) is True
+    assert messaging.chat_ids == [-100]
+
+
+@pytest.mark.asyncio
 async def test_welcome_is_sent_when_subscriber_opens_bot(session):
     users = UserService(session)
     user, _ = await users.get_or_create(42, name="Анна")

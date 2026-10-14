@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
@@ -12,6 +12,9 @@ from app.max_api.types import extract_user, sent_message_mid
 from app.scenarios.base import Scenario, ScenarioContext
 
 logger = logging.getLogger(__name__)
+
+# Два одинаковых user_added подряд не публикуют второе приветствие.
+_REPEAT_GUARD = timedelta(minutes=2)
 
 
 class NewSubscriberScenario(Scenario):
@@ -56,7 +59,8 @@ class NewSubscriberScenario(Scenario):
         nick = _subscriber_nick(user_data, user)
 
         if kind == "channel":
-            if await _open_channel_welcome(ctx, platform_user_id, int(chat_id)):
+            previous = await _open_channel_welcome(ctx, platform_user_id, int(chat_id))
+            if previous is not None and _welcome_is_fresh(previous):
                 logger.info(
                     "Channel welcome already posted user=%s chat_id=%s",
                     platform_user_id,
@@ -175,6 +179,15 @@ async def delete_channel_welcomes(ctx: ScenarioContext, platform_user_id: int) -
             continue
         row.deleted_at = now
     await ctx.session.flush()
+
+
+def _welcome_is_fresh(row: ChannelWelcome) -> bool:
+    created = row.created_at
+    if created is None:
+        return False
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - created < _REPEAT_GUARD
 
 
 async def _open_channel_welcome(

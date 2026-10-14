@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Material, MaterialType
 from app.db.models.material_file import MaterialFile
 from app.services.material_files import file_path, list_files
+from app.config import link_opens_bot
 from app.max_api.client import (
     MaxApiClient,
     MaxApiError,
@@ -135,9 +136,14 @@ class MessagingService:
         action = button.action_type
         if action in {"open_bot", "link"}:
             url = button.url
+            if action == "open_bot" and not link_opens_bot(url):
+                from app.config import get_settings
+
+                live = get_settings().materials_deeplink
+                url = live if link_opens_bot(live) else url
             if not url and action == "open_bot":
                 url = await self.content.get_setting("useful_materials_deeplink")
-            if url:
+            if url and (action != "open_bot" or link_opens_bot(url)):
                 return link_button(button.title, url)
             return None
         if action == "callback":

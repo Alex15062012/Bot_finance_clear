@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
+from app.config import get_settings, link_opens_bot
 from app.db.models import (
     BotCommandRow,
     Button,
@@ -227,6 +227,8 @@ async def seed_content(session: AsyncSession) -> None:
         payload=settings.materials_start_payload,
         sort_order=1,
     )
+    await _repair_bot_deeplink(session, "useful_materials_deeplink", deeplink)
+    await _repair_button_url(session, "useful_materials", deeplink)
     await _ensure_button(
         session,
         code="menu_materials",
@@ -325,6 +327,27 @@ async def _ensure_setting(
     if row:
         return
     session.add(Setting(key=key, value=value, description=description))
+
+
+async def _repair_bot_deeplink(session: AsyncSession, key: str, deeplink: str) -> None:
+    """Подставляет ник бота, если в базе осталась ссылка https://max.ru/?start=..."""
+    if not link_opens_bot(deeplink):
+        return
+    result = await session.execute(select(Setting).where(Setting.key == key))
+    row = result.scalar_one_or_none()
+    if row is None or link_opens_bot(row.value):
+        return
+    row.value = deeplink
+
+
+async def _repair_button_url(session: AsyncSession, code: str, deeplink: str) -> None:
+    if not link_opens_bot(deeplink):
+        return
+    result = await session.execute(select(Button).where(Button.code == code))
+    row = result.scalar_one_or_none()
+    if row is None or row.action_type != "open_bot" or link_opens_bot(row.url):
+        return
+    row.url = deeplink
 
 
 async def _ensure_message(
